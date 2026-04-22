@@ -1,5 +1,3 @@
-import { parseExcel } from '@/lib/excelParser'
-import { prisma } from '@/lib/prisma'
 import { NextRequest, NextResponse } from 'next/server'
 
 export const dynamic = 'force-dynamic'
@@ -15,6 +13,11 @@ export async function POST(request: NextRequest) {
     }
 
     const buffer = Buffer.from(await file.arrayBuffer())
+
+    // ✅ Both imports moved inside the handler
+    const { parseExcel } = await import('@/lib/excelParser')
+    const { prisma } = await import('@/lib/prisma')
+
     const { rows, errors } = parseExcel(buffer)
 
     if (rows.length === 0) {
@@ -54,14 +57,11 @@ export async function POST(request: NextRequest) {
       )
     )
 
-    const now = Date.now()
     let imported = 0
     let updated = 0
 
     for (const v of results) {
-      const diffMs = Math.abs(
-        v.updatedAt.getTime() - v.createdAt.getTime()
-      )
+      const diffMs = Math.abs(v.updatedAt.getTime() - v.createdAt.getTime())
       if (diffMs < 2000) imported++
       else updated++
     }
