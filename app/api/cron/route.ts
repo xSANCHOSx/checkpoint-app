@@ -1,4 +1,3 @@
-import { prisma } from '@/lib/prisma'
 import { NextRequest, NextResponse } from 'next/server'
 
 export const dynamic = 'force-dynamic'
@@ -7,7 +6,6 @@ export async function GET(request: NextRequest) {
   try {
     const CRON_SECRET = process.env.CRON_SECRET
 
-    // If missing, fail gracefully (prevents build crash)
     if (!CRON_SECRET) {
       console.error('CRON_SECRET is not defined')
       return NextResponse.json({ error: 'Server misconfigured' }, { status: 500 })
@@ -15,9 +13,7 @@ export async function GET(request: NextRequest) {
 
     const authHeader = request.headers.get('authorization') || ''
     const manualSecret = request.headers.get('x-cron-secret') || ''
-    const bearerSecret = authHeader.startsWith('Bearer ')
-      ? authHeader.slice(7)
-      : ''
+    const bearerSecret = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : ''
 
     const isVercelCron = bearerSecret === CRON_SECRET
     const isManualCall = manualSecret === CRON_SECRET
@@ -25,6 +21,9 @@ export async function GET(request: NextRequest) {
     if (!isVercelCron && !isManualCall) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+
+    // ✅ Import inside the handler — never runs at build time
+    const { prisma } = await import('@/lib/prisma')
 
     const now = new Date()
     const cutoff30Days = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
