@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: always
+    environment:
+      POSTGRES_DB: checkpoint_db
+      POSTGRES_USER: checkpoint_user
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"   # можна прибрати у продакшні
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U checkpoint_user -d checkpoint_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  app:
+    build: .
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgresql://checkpoint_user:${DB_PASSWORD}@db:5432/checkpoint_db
+      CRON_SECRET: ${CRON_SECRET}
+      APP_URL: ${APP_URL}
+      NEXTAUTH_URL: ${APP_URL}
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
+      ADMIN_USER: ${ADMIN_USER}
+      ADMIN_PASS: ${ADMIN_PASS}
+      NODE_ENV: production
+    depends_on:
+      db:
+        condition: service_healthy
+    # Виконуємо міграцію перед стартом
+    command: >
+      sh -c "npx prisma migrate deploy && node server.js"
+
+volumes:
+  pgdata:
