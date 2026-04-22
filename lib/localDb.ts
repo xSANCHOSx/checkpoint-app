@@ -11,6 +11,7 @@ export interface LocalVehicle {
   expiresAt: string | null  // ISO string
   isExpired: boolean
   note: string | null
+  source: string            // 'manual' | 'excel'
   updatedAt: string         // ISO string — для delta-sync
 }
 
@@ -68,4 +69,16 @@ export async function markLogsSynced(ids: number[]): Promise<void> {
 // Кількість несинхронізованих логів
 export async function getPendingCount(): Promise<number> {
   return localDb.pendingLogs.where('synced').equals(0).count()
+}
+
+// Синхронізація авто з сервера до Dexie
+export async function syncVehiclesToLocal(vehicles: LocalVehicle[]): Promise<number> {
+  if (vehicles.length === 0) return 0
+  await localDb.vehicles.bulkPut(vehicles)
+  return vehicles.length
+}
+
+// Отримати кількість авто в локальній БД
+export async function getLocalVehicleCount(): Promise<number> {
+  return localDb.vehicles.count()
 }
