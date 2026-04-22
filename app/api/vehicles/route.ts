@@ -1,8 +1,11 @@
-import { extractDigits, normalizePlate } from '@/lib/plateUtils'
-import { prisma } from '@/lib/prisma'
 import { NextRequest, NextResponse } from 'next/server'
 
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
 export async function GET(request: NextRequest) {
+  const { extractDigits, normalizePlate } = await import('@/lib/plateUtils')
+  const { prisma } = await import('@/lib/prisma')
   const { searchParams } = request.nextUrl
   const page = Math.max(1, parseInt(searchParams.get('page') || '1'))
   const limit = Math.min(200, parseInt(searchParams.get('limit') || '50'))

@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
 
 export async function POST(request: NextRequest) {
   const body = await request.json()
-
+  const { prisma } = await import('@/lib/prisma')
   const log = await prisma.accessLog.create({
     data: {
       plate: body.plate,

@@ -1,14 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
-import { getVehicleStatus, getDaysLeft, getDaysOverdue } from '@/lib/plateUtils'
+
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
 
 export async function GET(request: NextRequest) {
   const q = request.nextUrl.searchParams.get('q') || ''
-
+  
   if (q.length < 2) {
     return NextResponse.json([])
   }
-
+  const { prisma } = await import('@/lib/prisma')
+  const { getVehicleStatus, getDaysLeft, getDaysOverdue } = await import('@/lib/plateUtils')
   const vehicles = await prisma.vehicle.findMany({
     where: { digits: { contains: q } },
     orderBy: { company: 'asc' },

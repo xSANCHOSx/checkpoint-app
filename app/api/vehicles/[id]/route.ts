@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
-import { normalizePlate, extractDigits } from '@/lib/plateUtils'
+
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
 
 export async function PUT(
   request: NextRequest,
@@ -8,6 +9,9 @@ export async function PUT(
 ) {
   const id = parseInt(params.id)
   if (isNaN(id)) return NextResponse.json({ error: 'Invalid id' }, { status: 400 })
+
+const { prisma } = await import('@/lib/prisma')
+const { normalizePlate, extractDigits } = await import('@/lib/plateUtils')
 
   const body = await request.json()
   const plate = body.plate ? normalizePlate(body.plate) : undefined

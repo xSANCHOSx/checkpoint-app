@@ -1,5 +1,8 @@
-import { prisma } from '@/lib/prisma'
+
 import { NextRequest, NextResponse } from 'next/server'
+
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
 
 // GET /api/vehicles/sync?since=2024-01-01T00:00:00Z
 // Повертає всі авто змінені після вказаної дати (для delta-sync)
@@ -7,7 +10,7 @@ export async function GET(request: NextRequest) {
   const since = request.nextUrl.searchParams.get('since')
 
   const where = since ? { updatedAt: { gt: new Date(since) } } : {}
-
+  const { prisma } = await import('@/lib/prisma')
   const vehicles = await prisma.vehicle.findMany({
     where,
     select: {
