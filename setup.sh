@@ -34,6 +34,13 @@ if [ "$NODE_VER" -lt 18 ]; then
 fi
 echo -e "${GREEN}✓ Node.js $(node -v)${NC}"
 
+# ── Перевірка pnpm ───────────────────────────────────────────
+if ! command -v pnpm &> /dev/null; then
+  echo -e "${YELLOW}▶ Встановлення pnpm...${NC}"
+  npm install -g pnpm
+fi
+echo -e "${GREEN}✓ pnpm $(pnpm -v)${NC}"
+
 # ── Вибір режиму розгортання ─────────────────────────────────
 echo ""
 echo -e "${BOLD}Оберіть режим розгортання:${NC}"
@@ -59,26 +66,26 @@ if [ "$MODE" = "1" ]; then
 
   if [ ! -f .env ]; then
     echo -e "${YELLOW}▶ Генерація .env...${NC}"
-    cp .env.example .env
+    cp .env.example .env 2>/dev/null || touch .env
 
     CRON_SECRET=$(openssl rand -base64 24 | tr -dc 'a-zA-Z0-9' | head -c 32)
     NEXTAUTH_SECRET=$(openssl rand -base64 32)
     DB_PASS=$(openssl rand -base64 16 | tr -dc 'a-zA-Z0-9' | head -c 20)
 
     if [[ "$OSTYPE" == "darwin"* ]]; then
-      sed -i '' "s/STRONG_PASSWORD/${DB_PASS}/g" .env
-      sed -i '' "s/random-secret-string-here/${CRON_SECRET}/" .env
-      sed -i '' "s/another-random-secret/${NEXTAUTH_SECRET}/" .env
-      sed -i '' "s|APP_URL=.*|APP_URL=http://localhost:3000|" .env
-      sed -i '' "s|NEXTAUTH_URL=.*|NEXTAUTH_URL=http://localhost:3000|" .env
-      sed -i '' "s/strong-admin-password/admin123/" .env
+      sed -i '' "s/STRONG_PASSWORD/${DB_PASS}/g" .env 2>/dev/null || true
+      sed -i '' "s/random-secret-string-here/${CRON_SECRET}/" .env 2>/dev/null || true
+      sed -i '' "s/another-random-secret/${NEXTAUTH_SECRET}/" .env 2>/dev/null || true
+      sed -i '' "s|APP_URL=.*|APP_URL=http://localhost:3000|" .env 2>/dev/null || true
+      sed -i '' "s|NEXTAUTH_URL=.*|NEXTAUTH_URL=http://localhost:3000|" .env 2>/dev/null || true
+      sed -i '' "s/strong-admin-password/admin123/" .env 2>/dev/null || true
     else
-      sed -i "s/STRONG_PASSWORD/${DB_PASS}/g" .env
-      sed -i "s/random-secret-string-here/${CRON_SECRET}/" .env
-      sed -i "s/another-random-secret/${NEXTAUTH_SECRET}/" .env
-      sed -i "s|APP_URL=.*|APP_URL=http://localhost:3000|" .env
-      sed -i "s|NEXTAUTH_URL=.*|NEXTAUTH_URL=http://localhost:3000|" .env
-      sed -i "s/strong-admin-password/admin123/" .env
+      sed -i "s/STRONG_PASSWORD/${DB_PASS}/g" .env 2>/dev/null || true
+      sed -i "s/random-secret-string-here/${CRON_SECRET}/" .env 2>/dev/null || true
+      sed -i "s/another-random-secret/${NEXTAUTH_SECRET}/" .env 2>/dev/null || true
+      sed -i "s|APP_URL=.*|APP_URL=http://localhost:3000|" .env 2>/dev/null || true
+      sed -i "s|NEXTAUTH_URL=.*|NEXTAUTH_URL=http://localhost:3000|" .env 2>/dev/null || true
+      sed -i "s/strong-admin-password/admin123/" .env 2>/dev/null || true
     fi
 
     echo -e "${GREEN}✓ .env створено${NC}"
@@ -112,7 +119,7 @@ elif [ "$MODE" = "2" ]; then
   echo ""
   echo -e "${YELLOW}Перед деплоєм потрібно:${NC}"
   echo -e "  1. Акаунт на ${CYAN}vercel.com${NC}"
-  echo -e "  2. Безкоштовна PostgreSQL БД — ${CYAN}neon.tech${NC}"
+  echo -e "  2. Безкоштовна PostgreSQL БД — ${CYAN}supabase.com${NC} або ${CYAN}neon.tech${NC}"
   echo -e "  3. Код завантажено на GitHub"
   echo ""
   read -rp "Продовжити? [y/N]: " CONFIRM
@@ -131,7 +138,7 @@ elif [ "$MODE" = "2" ]; then
 
   echo ""
   echo -e "${YELLOW}▶ Встановлення залежностей...${NC}"
-  npm install
+  pnpm install
   echo -e "${GREEN}✓ Залежності встановлено${NC}"
 
   CRON_SECRET=$(openssl rand -base64 24 | tr -dc 'a-zA-Z0-9' | head -c 32)
@@ -147,9 +154,10 @@ elif [ "$MODE" = "2" ]; then
   vercel link
 
   echo ""
-  echo -e "${CYAN}Введіть DATABASE_URL з Neon:${NC}"
-  echo -e "  Отримати: ${CYAN}https://neon.tech${NC} → New Project → Dashboard → Connection string"
-  echo -e "  Формат: ${YELLOW}postgresql://user:pass@ep-xxx.neon.tech/dbname?sslmode=require${NC}"
+  echo -e "${CYAN}Введіть DATABASE_URL (наприклад, з Supabase або Neon):${NC}"
+  echo -e "  Supabase: Project Settings → Database → Connection string → URI"
+  echo -e "  Neon: Dashboard → Connection string"
+  echo -e "  Формат: ${YELLOW}postgresql://user:pass@host:port/dbname?sslmode=require${NC}"
   echo ""
   read -rp "DATABASE_URL: " DATABASE_URL
 
@@ -173,13 +181,13 @@ elif [ "$MODE" = "2" ]; then
 
   echo ""
   echo -e "${YELLOW}▶ Генерація Prisma client...${NC}"
-  DATABASE_URL="$DATABASE_URL" npx prisma generate
+  DATABASE_URL="$DATABASE_URL" pnpm exec prisma generate
   echo -e "${GREEN}✓ Prisma client згенеровано${NC}"
 
   echo ""
   echo -e "${YELLOW}▶ Застосування міграцій до БД...${NC}"
-  DATABASE_URL="$DATABASE_URL" npx prisma migrate deploy 2>/dev/null || \
-  DATABASE_URL="$DATABASE_URL" npx prisma db push
+  DATABASE_URL="$DATABASE_URL" pnpm exec prisma migrate deploy 2>/dev/null || \
+  DATABASE_URL="$DATABASE_URL" pnpm exec prisma db push
   echo -e "${GREEN}✓ БД ініціалізовано${NC}"
 
   echo ""
@@ -224,7 +232,7 @@ elif [ "$MODE" = "3" ]; then
   echo ""
 
   if [ ! -f .env ]; then
-    cp .env.example .env
+    cp .env.example .env 2>/dev/null || touch .env
     echo -e "${YELLOW}  Відредагуйте .env — вкажіть DATABASE_URL для локального PostgreSQL${NC}"
     echo -e "  Приклад: ${CYAN}postgresql://postgres:password@localhost:5432/checkpoint_db${NC}"
     echo ""
@@ -232,19 +240,19 @@ elif [ "$MODE" = "3" ]; then
   fi
 
   echo -e "${YELLOW}▶ Встановлення залежностей...${NC}"
-  npm install
+  pnpm install
 
   echo -e "${YELLOW}▶ Генерація Prisma client...${NC}"
-  npx prisma generate
+  pnpm exec prisma generate
 
   echo -e "${YELLOW}▶ Запуск міграцій...${NC}"
-  npx prisma migrate dev --name init 2>/dev/null || npx prisma migrate deploy
+  pnpm exec prisma migrate dev --name init 2>/dev/null || pnpm exec prisma migrate deploy
 
   echo ""
   echo -e "${GREEN}✓ Готово! Запуск dev-сервера...${NC}"
   echo -e "  Адреса: ${CYAN}http://localhost:3000${NC}"
   echo ""
-  npm run dev
+  pnpm run dev
 
 else
   echo -e "${RED}✗ Невідомий вибір. Введіть 1, 2 або 3.${NC}"
