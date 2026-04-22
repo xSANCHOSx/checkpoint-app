@@ -44,6 +44,7 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   const id = parseInt(params.id)
+  const { prisma } = await import('@/lib/prisma')
   if (isNaN(id)) return NextResponse.json({ error: 'Invalid id' }, { status: 400 })
 
   try {
