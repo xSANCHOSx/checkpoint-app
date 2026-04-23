@@ -2,12 +2,15 @@ import { NextResponse, type NextRequest } from 'next/server'
 
 const PROTECTED_PATHS = ['/admin', '/api/vehicles', '/api/import', '/api/logs']
 
+// Публічні виключення із захищених шляхів
+const PUBLIC_EXCEPTIONS = ['/api/vehicles/sync', '/api/logs/batch']
+
 function isProtected(pathname: string): boolean {
+  if (PUBLIC_EXCEPTIONS.some(p => pathname.startsWith(p))) return false
   return PROTECTED_PATHS.some(p => pathname.startsWith(p))
 }
 
 export function middleware(req: NextRequest) {
-  // Пошук /api/search доступний без авторизації (для оператора)
   if (!isProtected(req.nextUrl.pathname)) {
     return NextResponse.next()
   }

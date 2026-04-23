@@ -4,25 +4,24 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 model Vehicle {
   id           Int        @id @default(autoincrement())
-  plate        String     @unique  // Повний номер: "AA1234BB"
-  digits       String              // Тільки цифри: "1234" — для швидкого пошуку
-  company      String              // Назва фірми або проекту
-  contactName  String?             // Контактна особа (необов'язково)
-  contactPhone String?             // Телефон (необов'язково)
-  accessType   AccessType          // PERMANENT або TEMPORARY
-  expiresAt    DateTime?           // null = постійний, дата = тимчасовий
+  plate        String     @unique // Повний номер: "AA1234BB"
+  digits       String // Тільки цифри: "1234" — для швидкого пошуку
+  company      String // Назва фірми або проекту
+  contactName  String? // Контактна особа (необов'язково)
+  contactPhone String? // Телефон (необов'язково)
+  accessType   AccessType // PERMANENT або TEMPORARY
+  expiresAt    DateTime? // null = постійний, дата = тимчасовий
   isExpired    Boolean    @default(false)
   note         String?
-  source       String     @default("manual")  // "manual" | "excel"
+  source       String     @default("manual") // "manual" | "excel"
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 
-  logs         AccessLog[]
+  logs AccessLog[]
 
   @@index([digits])
   @@index([isExpired])
@@ -30,15 +29,15 @@ model Vehicle {
 }
 
 model AccessLog {
-  id         Int      @id @default(autoincrement())
+  id         Int       @id @default(autoincrement())
   plate      String
   vehicleId  Int?
-  vehicle    Vehicle? @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  vehicle    Vehicle?  @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
   result     Result
   operatorId String?
   note       String?
   syncedAt   DateTime?
-  timestamp  DateTime @default(now())
+  timestamp  DateTime  @default(now())
 
   @@index([plate])
   @@index([timestamp])
