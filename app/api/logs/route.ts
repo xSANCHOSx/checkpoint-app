@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-
-export const dynamic = 'force-dynamic'
-export const runtime = 'nodejs'
+import { prisma } from '@/lib/prisma'
 
 export async function POST(request: NextRequest) {
   const body = await request.json()
-  const { prisma } = await import('@/lib/prisma')
+
   const log = await prisma.accessLog.create({
     data: {
       plate: body.plate,
@@ -22,7 +20,6 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
-  const { prisma } = await import('@/lib/prisma')
   const { searchParams } = request.nextUrl
   const page = Math.max(1, parseInt(searchParams.get('page') || '1'))
   const limit = Math.min(200, parseInt(searchParams.get('limit') || '50'))

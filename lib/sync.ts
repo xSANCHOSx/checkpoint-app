@@ -1,4 +1,4 @@
-import { getLocalVehicleCount, getPendingLogs, localDb, markLogsSynced, syncVehiclesToLocal } from './localDb'
+import { localDb, getPendingLogs, markLogsSynced } from './localDb'
 
 const LAST_SYNC_KEY = 'checkpoint_last_sync'
 
@@ -52,11 +52,11 @@ async function pullVehicles(): Promise<number> {
     const vehicles = await res.json()
     if (vehicles.length === 0) return 0
 
-    // Синхронізуємо авто до локальної БД
-    const synced = await syncVehiclesToLocal(vehicles)
+    // bulkPut = insert або update (upsert)
+    await localDb.vehicles.bulkPut(vehicles)
     localStorage.setItem(LAST_SYNC_KEY, new Date().toISOString())
 
-    return synced
+    return vehicles.length
   } catch {
     return 0
   }
@@ -67,16 +67,4 @@ export async function fullSync(): Promise<void> {
   localStorage.removeItem(LAST_SYNC_KEY)
   await localDb.vehicles.clear()
   await pullVehicles()
-}
-
-// Перевірити чи потрібна повна синхронізація
-export async function shouldPerformFullSync(): Promise<boolean> {
-  if (typeof window === 'undefined') return false
-  
-  const hasLastSync = localStorage.getItem(LAST_SYNC_KEY)
-  if (!hasLastSync) return true
-  
-  // Якщо локальна БД порожня, виконати повну синхронізацію
-  const localCount = await getLocalVehicleCount()
-  return localCount === 0
 }

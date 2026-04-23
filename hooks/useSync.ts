@@ -1,8 +1,8 @@
 'use client'
-import { getPendingCount } from '@/lib/localDb'
-import { fullSync, shouldPerformFullSync, syncAll } from '@/lib/sync'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { useOnlineStatus } from './useOnlineStatus'
+import { syncAll, fullSync } from '@/lib/sync'
+import { getPendingCount } from '@/lib/localDb'
 
 const SYNC_INTERVAL_MS = 30 * 60 * 1000 // 30 хвилин
 
@@ -12,7 +12,6 @@ export function useSync() {
   const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null)
   const [pendingCount, setPendingCount] = useState(0)
   const intervalRef = useRef<ReturnType<typeof setInterval>>()
-  const initRef = useRef(false)
 
   // ✅ ВИПРАВЛЕНО: оновлюємо лічильник несинхронізованих логів
   const refreshPendingCount = useCallback(async () => {
@@ -26,36 +25,20 @@ export function useSync() {
 
   // При першому завантаженні — перевірити чи є дані в IndexedDB
   useEffect(() => {
-    if (initRef.current) return
-    initRef.current = true
-
     refreshPendingCount()
 
-    const initializeSync = async () => {
-      try {
-        // Перевірити чи потрібна повна синхронізація
-        const needsFullSync = await shouldPerformFullSync()
+    const isFirstTime =
+      typeof localStorage !== 'undefined' &&
+      !localStorage.getItem('checkpoint_last_sync')
 
-        if (needsFullSync && isOnline) {
-          setIsSyncing(true)
-          await fullSync()
-          setIsSyncing(false)
-          setLastSyncTime(new Date())
-          refreshPendingCount()
-        } else if (isOnline) {
-          // Якщо локальна БД вже має дані, виконати дельта-синхронізацію
-          setIsSyncing(true)
-          await syncAll()
-          setIsSyncing(false)
-          setLastSyncTime(new Date())
-          refreshPendingCount()
-        }
-      } catch (error) {
-        console.error('Initialization sync failed:', error)
-      }
+    if (isFirstTime && isOnline) {
+      setIsSyncing(true)
+      fullSync().finally(() => {
+        setIsSyncing(false)
+        setLastSyncTime(new Date())
+        refreshPendingCount()
+      })
     }
-
-    initializeSync()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 

@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-
-export const dynamic = 'force-dynamic'
-export const runtime = 'nodejs'
+import { prisma } from '@/lib/prisma'
+import { normalizePlate, extractDigits } from '@/lib/plateUtils'
 
 export async function PUT(
   request: NextRequest,
@@ -9,9 +8,6 @@ export async function PUT(
 ) {
   const id = parseInt(params.id)
   if (isNaN(id)) return NextResponse.json({ error: 'Invalid id' }, { status: 400 })
-
-const { prisma } = await import('@/lib/prisma')
-const { normalizePlate, extractDigits } = await import('@/lib/plateUtils')
 
   const body = await request.json()
   const plate = body.plate ? normalizePlate(body.plate) : undefined
@@ -44,7 +40,6 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   const id = parseInt(params.id)
-  const { prisma } = await import('@/lib/prisma')
   if (isNaN(id)) return NextResponse.json({ error: 'Invalid id' }, { status: 400 })
 
   try {

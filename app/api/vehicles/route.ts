@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-
-export const dynamic = 'force-dynamic'
-export const runtime = 'nodejs'
+import { prisma } from '@/lib/prisma'
+import { normalizePlate, extractDigits } from '@/lib/plateUtils'
 
 export async function GET(request: NextRequest) {
-  const { prisma } = await import('@/lib/prisma')
   const { searchParams } = request.nextUrl
   const page = Math.max(1, parseInt(searchParams.get('page') || '1'))
   const limit = Math.min(200, parseInt(searchParams.get('limit') || '50'))
@@ -38,8 +36,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   const body = await request.json()
-  const { extractDigits, normalizePlate } = await import('@/lib/plateUtils')
-  const { prisma } = await import('@/lib/prisma')
+
   const plate = normalizePlate(body.plate || '')
   if (!plate) {
     return NextResponse.json({ error: "Номер обов'язковий" }, { status: 400 })
