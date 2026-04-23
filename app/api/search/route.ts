@@ -1,6 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { getDaysLeft, getDaysOverdue, getVehicleStatus } from '@/lib/plateUtils'
 import { prisma } from '@/lib/prisma'
-import { getVehicleStatus, getDaysLeft, getDaysOverdue } from '@/lib/plateUtils'
+import { Vehicle } from '@prisma/client'   
+import { NextRequest, NextResponse } from 'next/server'
 
 export async function GET(request: NextRequest) {
   const q = request.nextUrl.searchParams.get('q') || ''
@@ -15,7 +16,7 @@ export async function GET(request: NextRequest) {
     take: 10,
   })
 
-  const result = vehicles.map(v => ({
+  const result = vehicles.map((v: Vehicle) => ({
     id: v.id,
     plate: v.plate,
     company: v.company,
