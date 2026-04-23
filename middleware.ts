@@ -7,6 +7,7 @@ function isProtected(pathname: string): boolean {
 }
 
 export function middleware(req: NextRequest) {
+  // Пошук /api/search доступний без авторизації (для оператора)
   if (!isProtected(req.nextUrl.pathname)) {
     return NextResponse.next()
   }
@@ -15,24 +16,18 @@ export function middleware(req: NextRequest) {
   const [scheme, b64] = authHeader.split(' ')
 
   if (scheme === 'Basic' && b64) {
-    try {
-      // ✅ Edge-safe decoding
-      const decoded = atob(b64)
+    const decoded = Buffer.from(b64, 'base64').toString('utf-8')
+    const colonIdx = decoded.indexOf(':')
+    if (colonIdx !== -1) {
+      const user = decoded.slice(0, colonIdx)
+      const pass = decoded.slice(colonIdx + 1)
 
-      const colonIdx = decoded.indexOf(':')
-      if (colonIdx !== -1) {
-        const user = decoded.slice(0, colonIdx)
-        const pass = decoded.slice(colonIdx + 1)
-
-        if (
-          user === process.env.ADMIN_USER &&
-          pass === process.env.ADMIN_PASS
-        ) {
-          return NextResponse.next()
-        }
+      if (
+        user === process.env.ADMIN_USER &&
+        pass === process.env.ADMIN_PASS
+      ) {
+        return NextResponse.next()
       }
-    } catch (e) {
-      console.error('Auth decode error:', e)
     }
   }
 
