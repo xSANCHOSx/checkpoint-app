@@ -47,12 +47,12 @@ export default function VehiclesPage() {
   const fetchFromLocal = useCallback(async () => {
     let query = localDb.vehicles.toCollection()
 
-    // Фільтр по типу
     if (filter === 'permanent') query = localDb.vehicles.where('accessType').equals('PERMANENT')
     if (filter === 'temporary') query = localDb.vehicles.where('accessType').equals('TEMPORARY')
-    if (filter === 'expired')   query = localDb.vehicles.where('isExpired').equals(1 as unknown as boolean)
 
     let all = await query.toArray()
+
+    if (filter === 'expired') all = all.filter(v => v.isExpired)
 
     // Пошук
     if (search.trim()) {
