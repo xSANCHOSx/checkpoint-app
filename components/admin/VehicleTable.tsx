@@ -5,9 +5,10 @@ interface Props {
   vehicles: Vehicle[]
   onEdit: (v: Vehicle) => void
   onDelete: (id: number) => void
+  readOnly?: boolean
 }
 
-export function VehicleTable({ vehicles, onEdit, onDelete }: Props) {
+export function VehicleTable({ vehicles, onEdit, onDelete, readOnly }: Props) {
   if (vehicles.length === 0) {
     return (
       <div className="text-center py-16 text-gray-400 bg-white rounded-xl border border-gray-200">
@@ -75,18 +76,25 @@ export function VehicleTable({ vehicles, onEdit, onDelete }: Props) {
                   )}
                 </td>
                 <td className="px-4 py-3 text-right whitespace-nowrap">
-                  <button
-                    onClick={() => onEdit(v)}
-                    className="text-blue-600 hover:text-blue-800 text-xs mr-3 font-medium"
-                  >
-                    Редагувати
-                  </button>
-                  <button
-                    onClick={() => onDelete(v.id)}
-                    className="text-red-500 hover:text-red-700 text-xs font-medium"
-                  >
-                    Видалити
-                  </button>
+                  {!readOnly && (
+                    <>
+                      <button
+                        onClick={() => onEdit(v)}
+                        className="text-blue-600 hover:text-blue-800 text-xs mr-3 font-medium"
+                      >
+                        Редагувати
+                      </button>
+                      <button
+                        onClick={() => onDelete(v.id)}
+                        className="text-red-500 hover:text-red-700 text-xs font-medium"
+                      >
+                        Видалити
+                      </button>
+                    </>
+                  )}
+                  {readOnly && (
+                    <span className="text-xs text-gray-300">офлайн</span>
+                  )}
                 </td>
               </tr>
             )

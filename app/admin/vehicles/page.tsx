@@ -4,6 +4,8 @@ import Link from 'next/link'
 import { VehicleTable } from '@/components/admin/VehicleTable'
 import { VehicleForm } from '@/components/admin/VehicleForm'
 import { ExcelImport } from '@/components/admin/ExcelImport'
+import { localDb, type LocalVehicle } from '@/lib/localDb'
+import { useOnlineStatus } from '@/hooks/useOnlineStatus'
 
 export interface Vehicle {
   id: number
@@ -19,7 +21,16 @@ export interface Vehicle {
   createdAt: string
 }
 
+function localToVehicle(v: LocalVehicle): Vehicle {
+  return {
+    ...v,
+    source: 'local',
+    createdAt: v.updatedAt,
+  }
+}
+
 export default function VehiclesPage() {
+  const isOnline = useOnlineStatus()
   const [vehicles, setVehicles] = useState<Vehicle[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
@@ -29,30 +40,68 @@ export default function VehiclesPage() {
   const [showForm, setShowForm] = useState(false)
   const [showImport, setShowImport] = useState(false)
   const [editVehicle, setEditVehicle] = useState<Vehicle | null>(null)
+  const [isLocal, setIsLocal] = useState(false)
 
   const LIMIT = 50
+
+  const fetchFromLocal = useCallback(async () => {
+    let query = localDb.vehicles.toCollection()
+
+    // Фільтр по типу
+    if (filter === 'permanent') query = localDb.vehicles.where('accessType').equals('PERMANENT')
+    if (filter === 'temporary') query = localDb.vehicles.where('accessType').equals('TEMPORARY')
+    if (filter === 'expired')   query = localDb.vehicles.where('isExpired').equals(1 as unknown as boolean)
+
+    let all = await query.toArray()
+
+    // Пошук
+    if (search.trim()) {
+      const q = search.trim().toLowerCase()
+      all = all.filter(v =>
+        v.plate.toLowerCase().includes(q) || v.company.toLowerCase().includes(q)
+      )
+    }
+
+    const total = all.length
+    const paged = all.slice((page - 1) * LIMIT, page * LIMIT)
+    return { vehicles: paged.map(localToVehicle), total }
+  }, [page, filter, search])
+
+  const fetchFromApi = useCallback(async () => {
+    const params = new URLSearchParams({
+      page: String(page),
+      limit: String(LIMIT),
+      ...(filter && { filter }),
+      ...(search && { search }),
+    })
+    const res = await fetch(`/api/vehicles?${params}`)
+    return res.json() as Promise<{ vehicles: Vehicle[]; total: number }>
+  }, [page, filter, search])
 
   const fetchVehicles = useCallback(async () => {
     setLoading(true)
     try {
-      const params = new URLSearchParams({
-        page: String(page),
-        limit: String(LIMIT),
-        ...(filter && { filter }),
-        ...(search && { search }),
-      })
-      const res = await fetch(`/api/vehicles?${params}`)
-      const data = await res.json()
+      if (isOnline) {
+        try {
+          const data = await fetchFromApi()
+          setVehicles(data.vehicles)
+          setTotal(data.total)
+          setIsLocal(false)
+          return
+        } catch {
+          // API недоступне — fallback на локальну
+        }
+      }
+      const data = await fetchFromLocal()
       setVehicles(data.vehicles)
       setTotal(data.total)
+      setIsLocal(true)
     } finally {
       setLoading(false)
     }
-  }, [page, filter, search])
+  }, [isOnline, fetchFromApi, fetchFromLocal])
 
-  useEffect(() => {
-    fetchVehicles()
-  }, [fetchVehicles])
+  useEffect(() => { fetchVehicles() }, [fetchVehicles])
 
   const handleDelete = async (id: number) => {
     if (!confirm('Видалити це авто?')) return
@@ -71,6 +120,11 @@ export default function VehiclesPage() {
             <span className="text-gray-300">|</span>
             <h1 className="text-xl font-bold text-gray-800">🚗 Автомобілі</h1>
             <span className="text-sm text-gray-500">({total})</span>
+            {isLocal && (
+              <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">
+                📴 локальна база
+              </span>
+            )}
           </div>
           <div className="flex gap-2">
             <button
@@ -82,6 +136,8 @@ export default function VehiclesPage() {
             <button
               onClick={() => { setEditVehicle(null); setShowForm(true) }}
               className="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 transition-colors"
+              disabled={isLocal}
+              title={isLocal ? 'Додавання доступне тільки онлайн' : ''}
             >
               + Додати
             </button>
@@ -90,6 +146,13 @@ export default function VehiclesPage() {
       </header>
 
       <main className="max-w-6xl mx-auto px-6 py-6">
+        {/* Офлайн-банер */}
+        {isLocal && (
+          <div className="mb-4 bg-orange-50 border border-orange-200 text-orange-800 rounded-xl px-4 py-3 text-sm">
+            📴 Відображається локальна копія бази. Редагування недоступне до відновлення з'єднання.
+          </div>
+        )}
+
         {/* Фільтри */}
         <div className="flex flex-wrap gap-3 mb-4">
           <input
@@ -119,6 +182,7 @@ export default function VehiclesPage() {
             vehicles={vehicles}
             onEdit={v => { setEditVehicle(v); setShowForm(true) }}
             onDelete={handleDelete}
+            readOnly={isLocal}
           />
         )}
 
@@ -147,7 +211,7 @@ export default function VehiclesPage() {
       </main>
 
       {/* Форма додавання/редагування */}
-      {showForm && (
+      {showForm && !isLocal && (
         <VehicleForm
           vehicle={editVehicle}
           onClose={() => setShowForm(false)}
