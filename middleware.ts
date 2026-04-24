@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 const PROTECTED_PATHS = ['/admin', '/api/vehicles', '/api/import', '/api/logs']
 
 // Публічні виключення із захищених шляхів
+// /api/vehicles/sync та /api/logs/batch доступні без авторизації (для офлайн-синхронізації PWA)
 const PUBLIC_EXCEPTIONS = ['/api/vehicles/sync', '/api/logs/batch']
 
 function isProtected(pathname: string): boolean {
@@ -25,11 +26,20 @@ export function middleware(req: NextRequest) {
       const user = decoded.slice(0, colonIdx)
       const pass = decoded.slice(colonIdx + 1)
 
-      if (
-        user === process.env.ADMIN_USER &&
-        pass === process.env.ADMIN_PASS
-      ) {
-        return NextResponse.next()
+      // Константний час порівняння для захисту від timing attack
+      const expectedUser = process.env.ADMIN_USER ?? ''
+      const expectedPass = process.env.ADMIN_PASS ?? ''
+
+      const userMatch = user.length === expectedUser.length &&
+        Buffer.from(user).equals(Buffer.from(expectedUser))
+      const passMatch = pass.length === expectedPass.length &&
+        Buffer.from(pass).equals(Buffer.from(expectedPass))
+
+      if (userMatch && passMatch) {
+        const response = NextResponse.next()
+        // Заборонити кешування захищених відповідей
+        response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate')
+        return response
       }
     }
   }
@@ -38,6 +48,7 @@ export function middleware(req: NextRequest) {
     status: 401,
     headers: {
       'WWW-Authenticate': 'Basic realm="KPP Admin", charset="UTF-8"',
+      'Cache-Control': 'no-store',
     },
   })
 }

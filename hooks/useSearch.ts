@@ -1,6 +1,5 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
-import { useOnlineStatus } from './useOnlineStatus'
 import { searchLocal } from '@/lib/localDb'
 import { getVehicleStatus, getDaysLeft, getDaysOverdue } from '@/lib/plateUtils'
 
@@ -20,7 +19,6 @@ export interface SearchResult {
 }
 
 export function useSearch() {
-  const isOnline = useOnlineStatus()
   const [digits, setDigits] = useState('')
   const [results, setResults] = useState<SearchResult[]>([])
   const [isLoading, setIsLoading] = useState(false)
@@ -35,21 +33,14 @@ export function useSearch() {
       setIsLoading(true)
 
       try {
-        let raw: SearchResult[] = []
-
-        if (isOnline) {
-          const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`)
-          if (!res.ok) throw new Error('Search failed')
-          raw = await res.json()
-        } else {
-          const local = await searchLocal(q)
-          raw = local.map(v => ({
-            ...v,
-            status: getVehicleStatus(v),
-            daysLeft: getDaysLeft(v.expiresAt),
-            daysOverdue: getDaysOverdue(v.expiresAt),
-          }))
-        }
+        // Завжди використовуємо локальну IndexedDB — швидко і не залежить від інтернету
+        const local = await searchLocal(q)
+        const raw: SearchResult[] = local.map(v => ({
+          ...v,
+          status: getVehicleStatus(v),
+          daysLeft: getDaysLeft(v.expiresAt),
+          daysOverdue: getDaysOverdue(v.expiresAt),
+        }))
 
         setResults(raw)
       } catch {
@@ -58,7 +49,7 @@ export function useSearch() {
         setIsLoading(false)
       }
     },
-    [isOnline]
+    []
   )
 
   useEffect(() => {

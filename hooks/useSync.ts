@@ -4,13 +4,14 @@ import { useOnlineStatus } from './useOnlineStatus'
 import { syncAll, fullSync } from '@/lib/sync'
 import { getPendingCount } from '@/lib/localDb'
 
-const SYNC_INTERVAL_MS = 30 * 60 * 1000 // 30 хвилин
+const SYNC_INTERVAL_MS = 5 * 60 * 1000 // 5 хвилин
 
 export function useSync() {
   const isOnline = useOnlineStatus()
   const [isSyncing, setIsSyncing] = useState(false)
   const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null)
   const [pendingCount, setPendingCount] = useState(0)
+  const [syncError, setSyncError] = useState<string | null>(null)
   const intervalRef = useRef<ReturnType<typeof setInterval>>()
 
   // ✅ ВИПРАВЛЕНО: оновлюємо лічильник несинхронізованих логів
@@ -50,11 +51,17 @@ export function useSync() {
     }
 
     const doSync = async () => {
+      setSyncError(null)
       setIsSyncing(true)
-      await syncAll()
-      setIsSyncing(false)
-      setLastSyncTime(new Date())
-      refreshPendingCount()
+      try {
+        await syncAll()
+        setLastSyncTime(new Date())
+        refreshPendingCount()
+      } catch {
+        setSyncError('Помилка синхронізації')
+      } finally {
+        setIsSyncing(false)
+      }
     }
 
     doSync()
@@ -63,5 +70,20 @@ export function useSync() {
     return () => clearInterval(intervalRef.current)
   }, [isOnline, refreshPendingCount])
 
-  return { isOnline, isSyncing, lastSyncTime, pendingCount, refreshPendingCount }
+  const manualSync = useCallback(async () => {
+    if (!isOnline || isSyncing) return
+    setSyncError(null)
+    setIsSyncing(true)
+    try {
+      await syncAll()
+      setLastSyncTime(new Date())
+      refreshPendingCount()
+    } catch {
+      setSyncError('Помилка синхронізації')
+    } finally {
+      setIsSyncing(false)
+    }
+  }, [isOnline, isSyncing, refreshPendingCount])
+
+  return { isOnline, isSyncing, lastSyncTime, pendingCount, syncError, refreshPendingCount, manualSync }
 }
