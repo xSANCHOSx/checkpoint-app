@@ -1,4 +1,4 @@
-import withPWAInit from 'next-pwa'
+import withPWAInit from '@ducanh2912/next-pwa'
 
 const withPWA = withPWAInit({
   dest: 'public',
@@ -8,6 +8,7 @@ const withPWA = withPWAInit({
   fallbacks: {
     document: '/offline',
   },
+  aggressiveFrontEndNavCaching: false,
   runtimeCaching: [
     {
       // API — завжди з мережі, без кешування
