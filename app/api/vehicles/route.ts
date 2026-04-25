@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server'
+jimport { extractDigits, normalizePlate } from '@/lib/plateUtils'
 import { prisma } from '@/lib/prisma'
-import { normalizePlate, extractDigits } from '@/lib/plateUtils'
+import { NextRequest, NextResponse } from 'next/server'
 
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl
@@ -48,6 +48,7 @@ export async function POST(request: NextRequest) {
         plate,
         digits: extractDigits(plate),
         company: body.company || '',
+        projectId: body.projectId ? Number(body.projectId) : null,
         contactName: body.contactName || null,
         contactPhone: body.contactPhone || null,
         accessType: body.accessType || 'PERMANENT',
