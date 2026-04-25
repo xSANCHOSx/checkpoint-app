@@ -32,6 +32,7 @@ export async function syncAll(): Promise<{ pulled: number; pushed: number }> {
   const [pushed, pulled] = await Promise.all([
     pushPendingLogs(),
     pullVehicles(),
+    pullEmergencyVehicles(),
   ])
 
   return { pulled, pushed }
@@ -102,4 +103,21 @@ export async function fullSync(): Promise<void> {
   localStorage.removeItem(LAST_SYNC_KEY)
   await localDb.vehicles.clear()
   await pullVehicles()
+}
+
+// Завантажуємо аварійний список
+async function pullEmergencyVehicles(): Promise<number> {
+  try {
+    const vehicles: object[] = await withRetry(async () => {
+      const res = await fetch('/api/emergency/sync')
+      if (!res.ok) throw new Error(`Emergency sync failed: ${res.status}`)
+      return res.json()
+    })
+    if (!Array.isArray(vehicles)) return 0
+    await localDb.emergencyVehicles.clear()
+    await localDb.emergencyVehicles.bulkPut(vehicles as Parameters<typeof localDb.emergencyVehicles.bulkPut>[0])
+    return vehicles.length
+  } catch {
+    return 0
+  }
 }

@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
-import { searchLocal } from '@/lib/localDb'
+import { searchLocal, searchEmergency } from '@/lib/localDb'
 import { getVehicleStatus, getDaysLeft, getDaysOverdue } from '@/lib/plateUtils'
 
 export interface SearchResult {
@@ -16,6 +16,7 @@ export interface SearchResult {
   daysLeft: number | null
   daysOverdue: number | null
   note: string | null
+  isEmergency?: boolean
 }
 
 export function useSearch() {
@@ -23,34 +24,48 @@ export function useSearch() {
   const [results, setResults] = useState<SearchResult[]>([])
   const [isLoading, setIsLoading] = useState(false)
 
-  const search = useCallback(
-    async (q: string) => {
-      if (q.length < 2) {
-        setResults([])
-        return
-      }
+  const search = useCallback(async (q: string) => {
+    if (q.length < 2) { setResults([]); return }
+    setIsLoading(true)
+    try {
+      const [local, emergency] = await Promise.all([
+        searchLocal(q),
+        searchEmergency(q),
+      ])
 
-      setIsLoading(true)
+      const emergencyResults: SearchResult[] = emergency.map(e => ({
+        id: e.id,
+        plate: e.plate,
+        company: '🚨 Аварійний список',
+        contactName: null,
+        contactPhone: null,
+        accessType: 'PERMANENT',
+        expiresAt: null,
+        isExpired: false,
+        status: 'allowed',
+        daysLeft: null,
+        daysOverdue: null,
+        note: e.note,
+        isEmergency: true,
+      }))
 
-      try {
-        // Завжди використовуємо локальну IndexedDB — швидко і не залежить від інтернету
-        const local = await searchLocal(q)
-        const raw: SearchResult[] = local.map(v => ({
+      const emergencyPlates = new Set(emergency.map(e => e.plate))
+      const regularResults: SearchResult[] = local
+        .filter(v => !emergencyPlates.has(v.plate))
+        .map(v => ({
           ...v,
           status: getVehicleStatus(v),
           daysLeft: getDaysLeft(v.expiresAt),
           daysOverdue: getDaysOverdue(v.expiresAt),
         }))
 
-        setResults(raw)
-      } catch {
-        setResults([])
-      } finally {
-        setIsLoading(false)
-      }
-    },
-    []
-  )
+      setResults([...emergencyResults, ...regularResults])
+    } catch {
+      setResults([])
+    } finally {
+      setIsLoading(false)
+    }
+  }, [])
 
   useEffect(() => {
     const timer = setTimeout(() => search(digits), 300)

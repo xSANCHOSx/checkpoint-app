@@ -15,6 +15,9 @@ export function getVehicleStatus(vehicle: {
   isExpired: boolean
 }): 'allowed' | 'expired' | 'denied' {
   if (vehicle.accessType === 'PERMANENT') return 'allowed'
+  if (vehicle.accessType === 'SINGLE_USE') {
+    return vehicle.isExpired ? 'denied' : 'allowed'
+  }
   if (vehicle.isExpired) return 'expired'
 
   if (!vehicle.expiresAt) return 'denied'

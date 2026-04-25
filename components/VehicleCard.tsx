@@ -33,6 +33,22 @@ const STATUS_CONFIG = {
   },
 }
 
+const EMERGENCY_CONFIG = {
+  bg: 'bg-blue-50 border-blue-400 border-2',
+  badge: 'bg-blue-600 text-white',
+  icon: '🚨',
+  label: 'АВАРІЙНИЙ СПИСОК',
+  result: 'ALLOWED' as const,
+}
+
+const SINGLE_USE_USED_CONFIG = {
+  bg: 'bg-gray-50 border-gray-300',
+  badge: 'bg-gray-200 text-gray-700',
+  icon: '🔒',
+  label: 'РАЗОВИЙ — ВИКОРИСТАНО',
+  result: 'DENIED' as const,
+}
+
 function pluralDays(n: number): string {
   if (n === 1) return 'день'
   if (n >= 2 && n <= 4) return 'дні'
@@ -44,7 +60,12 @@ export function VehicleCard({ vehicle, onLogged }: Props) {
   const [logged, setLogged] = useState(false)
   const [logging, setLogging] = useState(false)
 
-  const config = STATUS_CONFIG[vehicle.status]
+  const isSingleUseUsed = vehicle.accessType === 'SINGLE_USE' && vehicle.isExpired
+  const config = vehicle.isEmergency
+    ? EMERGENCY_CONFIG
+    : isSingleUseUsed
+      ? SINGLE_USE_USED_CONFIG
+      : STATUS_CONFIG[vehicle.status]
 
   async function handleLog() {
     if (logging || logged) return
@@ -61,7 +82,7 @@ export function VehicleCard({ vehicle, onLogged }: Props) {
 
     try {
       if (isOnline) {
-        await fetch('/api/logs', {
+        await fetch('/api/checkpoint', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(logData),
@@ -104,7 +125,11 @@ export function VehicleCard({ vehicle, onLogged }: Props) {
 
           {/* Тип пропуску */}
           <div className="text-sm text-gray-500 mt-1">
-            {vehicle.accessType === 'PERMANENT' ? (
+            {vehicle.accessType === 'SINGLE_USE' ? (
+              isSingleUseUsed
+                ? '🔒 Разовий пропуск — вже використано'
+                : '1️⃣ Разовий пропуск — дійсний один раз'
+            ) : vehicle.accessType === 'PERMANENT' ? (
               '♾️ Постійний пропуск'
             ) : vehicle.status === 'allowed' && vehicle.daysLeft !== null ? (
               `⏳ Тимчасовий · ще ${vehicle.daysLeft} ${pluralDays(vehicle.daysLeft)}`

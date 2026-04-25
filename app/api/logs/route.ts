@@ -1,6 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
+function checkAdminAuth(request: NextRequest): boolean {
+  const authHeader = request.headers.get('authorization') || ''
+  const [scheme, b64] = authHeader.split(' ')
+  if (scheme !== 'Basic' || !b64) return false
+  const decoded = Buffer.from(b64, 'base64').toString('utf-8')
+  const colonIdx = decoded.indexOf(':')
+  if (colonIdx === -1) return false
+  const user = decoded.slice(0, colonIdx)
+  const pass = decoded.slice(colonIdx + 1)
+  const expectedUser = process.env.ADMIN_USER ?? ''
+  const expectedPass = process.env.ADMIN_PASS ?? ''
+  const userMatch = user.length === expectedUser.length && Buffer.from(user).equals(Buffer.from(expectedUser))
+  const passMatch = pass.length === expectedPass.length && Buffer.from(pass).equals(Buffer.from(expectedPass))
+  return userMatch && passMatch
+}
+
 export async function POST(request: NextRequest) {
   const body = await request.json()
 
@@ -20,6 +36,13 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
+  if (!checkAdminAuth(request)) {
+    return new NextResponse('Unauthorized', {
+      status: 401,
+      headers: { 'WWW-Authenticate': 'Basic realm="KPP Admin"', 'Cache-Control': 'no-store' },
+    })
+  }
+
   const { searchParams } = request.nextUrl
   const page = Math.max(1, parseInt(searchParams.get('page') || '1'))
   const limit = Math.min(200, parseInt(searchParams.get('limit') || '50'))

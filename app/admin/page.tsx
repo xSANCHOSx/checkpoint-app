@@ -69,6 +69,34 @@ export default function AdminPage() {
             </p>
           </Link>
 
+          {/* Аварійний список */}
+          <Link
+            href="/admin/emergency"
+            className="bg-white rounded-xl border border-blue-200 p-6 hover:shadow-md transition-shadow group"
+          >
+            <div className="text-3xl mb-3">🚨</div>
+            <h2 className="text-lg font-semibold text-gray-800 group-hover:text-blue-600 transition-colors">
+              Аварійний список
+            </h2>
+            <p className="text-sm text-gray-500 mt-1">
+              Авто що завжди пропускаються. Директор, охорона, ДСНС.
+            </p>
+          </Link>
+
+          {/* Проекти */}
+          <Link
+            href="/admin/projects"
+            className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-md transition-shadow group"
+          >
+            <div className="text-3xl mb-3">📁</div>
+            <h2 className="text-lg font-semibold text-gray-800 group-hover:text-blue-600 transition-colors">
+              Проекти
+            </h2>
+            <p className="text-sm text-gray-500 mt-1">
+              Групування авто по проектах. Вмикати/вимикати, видаляти цілий проект.
+            </p>
+          </Link>
+
         </div>
 
         {/* Синхронізація */}
