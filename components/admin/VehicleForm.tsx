@@ -119,7 +119,16 @@ export function VehicleForm({ vehicle, onClose, onSaved }: Props) {
             >
               <option value="PERMANENT">♾️ Постійний</option>
               <option value="TEMPORARY">⏳ Тимчасовий</option>
+              <option value="SINGLE_USE">1️⃣ Разовий (1 проїзд)</option>
             </select>
+          </div>
+
+          {form.accessType === 'SINGLE_USE' && (
+            <div className="bg-yellow-50 border border-yellow-200 rounded-xl px-4 py-3 text-sm text-yellow-800">
+              ⚠️ Після першого пропуску авто автоматично отримає статус <strong>DENIED</strong>.
+              Використовуйте для разових поставок, гостей, підрядників.
+            </div>
+          )}
           </div>
 
           {form.accessType === 'TEMPORARY' && (

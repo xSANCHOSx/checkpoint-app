@@ -6,18 +6,33 @@ datasource db {
   provider = "postgresql"
 }
 
+model Project {
+  id        Int       @id @default(autoincrement())
+  name      String    @unique
+  active    Boolean   @default(true)
+  note      String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  vehicles  Vehicle[]
+
+  @@index([active])
+}
+
 model Vehicle {
   id           Int        @id @default(autoincrement())
-  plate        String     @unique // Повний номер: "AA1234BB"
-  digits       String // Тільки цифри: "1234" — для швидкого пошуку
-  company      String // Назва фірми або проекту
-  contactName  String? // Контактна особа (необов'язково)
-  contactPhone String? // Телефон (необов'язково)
-  accessType   AccessType // PERMANENT або TEMPORARY
-  expiresAt    DateTime? // null = постійний, дата = тимчасовий
+  plate        String     @unique
+  digits       String
+  company      String
+  projectId    Int?
+  project      Project?   @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  contactName  String?
+  contactPhone String?
+  accessType   AccessType
+  expiresAt    DateTime?
   isExpired    Boolean    @default(false)
   note         String?
-  source       String     @default("manual") // "manual" | "excel"
+  source       String     @default("manual")
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 
@@ -26,6 +41,19 @@ model Vehicle {
   @@index([digits])
   @@index([isExpired])
   @@index([accessType])
+  @@index([projectId])
+}
+
+model EmergencyVehicle {
+  id        Int      @id @default(autoincrement())
+  plate     String   @unique
+  digits    String
+  note      String?
+  addedBy   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([digits])
 }
 
 model AccessLog {
@@ -47,6 +75,7 @@ model AccessLog {
 enum AccessType {
   PERMANENT
   TEMPORARY
+  SINGLE_USE
 }
 
 enum Result {

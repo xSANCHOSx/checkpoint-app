@@ -25,9 +25,19 @@ export interface PendingLog {
   synced: number        // 0 = не синхронізовано, 1 = синхронізовано
 }
 
+export interface LocalEmergencyVehicle {
+  id: number
+  plate: string
+  digits: string
+  note: string | null
+  addedBy: string | null
+  updatedAt: string
+}
+
 class CheckpointDB extends Dexie {
   vehicles!: Table<LocalVehicle>
   pendingLogs!: Table<PendingLog>
+  emergencyVehicles!: Table<LocalEmergencyVehicle>
 
   constructor() {
     super('checkpoint_db')
@@ -35,6 +45,12 @@ class CheckpointDB extends Dexie {
     this.version(1).stores({
       vehicles: 'id, digits, plate, isExpired, accessType',
       pendingLogs: '++id, synced, timestamp',
+    })
+
+    this.version(2).stores({
+      vehicles: 'id, digits, plate, isExpired, accessType',
+      pendingLogs: '++id, synced, timestamp',
+      emergencyVehicles: 'id, digits, plate',
     })
   }
 }
@@ -68,4 +84,10 @@ export async function markLogsSynced(ids: number[]): Promise<void> {
 // Кількість несинхронізованих логів
 export async function getPendingCount(): Promise<number> {
   return localDb.pendingLogs.where('synced').equals(0).count()
+}
+
+// Пошук в аварійному списку
+export async function searchEmergency(digits: string): Promise<LocalEmergencyVehicle[]> {
+  if (digits.length < 2) return []
+  return localDb.emergencyVehicles.filter(v => v.digits.includes(digits)).toArray()
 }

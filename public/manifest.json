@@ -23,5 +23,28 @@
       "purpose": "any maskable"
     }
   ],
-  "categories": ["utilities", "productivity"]
+  "categories": ["utilities", "productivity"],
+  "shortcuts": [
+    {
+      "name": "Пошук авто",
+      "short_name": "Пошук",
+      "description": "Перейти на головну сторінку пошуку",
+      "url": "/",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Журнал проїздів",
+      "short_name": "Журнал",
+      "description": "Переглянути журнал проїздів",
+      "url": "/admin/logs",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Список автомобілів",
+      "short_name": "Авто",
+      "description": "Керування списком автомобілів",
+      "url": "/admin/vehicles",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
 }

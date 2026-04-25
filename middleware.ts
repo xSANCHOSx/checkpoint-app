@@ -1,9 +1,19 @@
 import { NextResponse, type NextRequest } from 'next/server'
 
-const PROTECTED_PATHS = ['/admin', '/api/vehicles', '/api/import', '/api/logs']
+const PROTECTED_PATHS = ['/admin', '/api/vehicles', '/api/import', '/api/emergency', '/api/projects']
 
-// Публічні виключення із захищених шляхів
-const PUBLIC_EXCEPTIONS = ['/api/vehicles/sync', '/api/logs/batch']
+// Публічні API для операторів (без авторизації):
+// /api/vehicles/sync  — синхронізація авто
+// /api/logs/batch     — офлайн-push логів
+// /api/checkpoint     — запис проїзду оператором
+//
+// Захищено (Basic Auth):
+// /admin/*            — адмін-панель
+// /api/vehicles/*     — CRUD авто (крім /sync)
+// /api/import         — імпорт Excel
+// /api/logs (GET)     — перегляд логів адміном — захищаємо в самому route handler
+
+const PUBLIC_EXCEPTIONS = ['/api/vehicles/sync', '/api/emergency/sync']
 
 function isProtected(pathname: string): boolean {
   if (PUBLIC_EXCEPTIONS.some(p => pathname.startsWith(p))) return false
@@ -25,11 +35,20 @@ export function middleware(req: NextRequest) {
       const user = decoded.slice(0, colonIdx)
       const pass = decoded.slice(colonIdx + 1)
 
-      if (
-        user === process.env.ADMIN_USER &&
-        pass === process.env.ADMIN_PASS
-      ) {
-        return NextResponse.next()
+      // Константний час порівняння для захисту від timing attack
+      const expectedUser = process.env.ADMIN_USER ?? ''
+      const expectedPass = process.env.ADMIN_PASS ?? ''
+
+      const userMatch = user.length === expectedUser.length &&
+        Buffer.from(user).equals(Buffer.from(expectedUser))
+      const passMatch = pass.length === expectedPass.length &&
+        Buffer.from(pass).equals(Buffer.from(expectedPass))
+
+      if (userMatch && passMatch) {
+        const response = NextResponse.next()
+        // Заборонити кешування захищених відповідей
+        response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate')
+        return response
       }
     }
   }
@@ -38,6 +57,7 @@ export function middleware(req: NextRequest) {
     status: 401,
     headers: {
       'WWW-Authenticate': 'Basic realm="KPP Admin", charset="UTF-8"',
+      'Cache-Control': 'no-store',
     },
   })
 }
@@ -46,7 +66,8 @@ export const config = {
   matcher: [
     '/admin/:path*',
     '/api/vehicles/:path*',
-    '/api/import',
-    '/api/logs/:path*',
+    '/api/import/:path*',
+    '/api/emergency/:path*',
+    '/api/projects/:path*',
   ],
 }

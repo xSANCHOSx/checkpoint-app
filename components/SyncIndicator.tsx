@@ -2,7 +2,7 @@
 import { useSync } from '@/hooks/useSync'
 
 export function SyncIndicator() {
-  const { isOnline, isSyncing, lastSyncTime, pendingCount } = useSync()
+  const { isOnline, isSyncing, lastSyncTime, pendingCount, syncError, manualSync } = useSync()
 
   const formatTime = (date: Date | null) => {
     if (!date) return null
@@ -30,6 +30,23 @@ export function SyncIndicator() {
         <span className="text-orange-600 text-xs font-medium">
           · {pendingCount} очікують
         </span>
+      )}
+
+      {syncError && (
+        <span className="text-red-500 text-xs font-medium" title={syncError}>
+          ⚠ Помилка
+        </span>
+      )}
+
+      {isOnline && !isSyncing && (
+        <button
+          onClick={manualSync}
+          title="Синхронізувати зараз"
+          className="text-gray-400 hover:text-blue-600 transition-colors text-xs ml-1"
+          aria-label="Ручна синхронізація"
+        >
+          🔄
+        </button>
       )}
     </div>
   )

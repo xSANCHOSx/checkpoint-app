@@ -1,18 +1,27 @@
-import withPWAInit from 'next-pwa'
+import withPWAInit from '@ducanh2912/next-pwa'
 
 const withPWA = withPWAInit({
   dest: 'public',
   register: true,
   skipWaiting: true,
   disable: process.env.NODE_ENV === 'development',
+  fallbacks: {
+    document: '/offline',
+  },
+  aggressiveFrontEndNavCaching: false,
   runtimeCaching: [
     {
-      // API — завжди з мережі
+      // API — завжди з мережі, без кешування
       urlPattern: ({ url }) => url.pathname.startsWith('/api/'),
       handler: 'NetworkOnly',
     },
     {
-      // Статичні ресурси
+      // Адмін-сторінки — тільки з мережі (не кешуємо захищені маршрути)
+      urlPattern: ({ url }) => url.pathname.startsWith('/admin'),
+      handler: 'NetworkOnly',
+    },
+    {
+      // Статичні ресурси — спочатку кеш
       urlPattern: /\.(?:js|css|woff|woff2|ttf|otf|eot|png|jpg|jpeg|gif|svg|ico|webp)$/i,
       handler: 'CacheFirst',
       options: {
@@ -24,8 +33,9 @@ const withPWA = withPWAInit({
       },
     },
     {
-      // HTML сторінки
-      urlPattern: ({ url }) => !url.pathname.startsWith('/api/'),
+      // Публічні HTML-сторінки — мережа з fallback на кеш
+      urlPattern: ({ url }) =>
+        !url.pathname.startsWith('/api/') && !url.pathname.startsWith('/admin'),
       handler: 'NetworkFirst',
       options: {
         cacheName: 'pages-cache',
@@ -37,12 +47,11 @@ const withPWA = withPWAInit({
       },
     },
   ],
-});
+})
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  // Додайте ваші специфічні налаштування тут
-};
+}
 
-export default withPWA(nextConfig);
+export default withPWA(nextConfig)
