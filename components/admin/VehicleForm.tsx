@@ -129,7 +129,6 @@ export function VehicleForm({ vehicle, onClose, onSaved }: Props) {
               Використовуйте для разових поставок, гостей, підрядників.
             </div>
           )}
-          </div>
 
           {form.accessType === 'TEMPORARY' && (
             <div>
