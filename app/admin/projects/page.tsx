@@ -1,6 +1,6 @@
 'use client'
-import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { useEffect, useState } from 'react'
 
 interface Project {
   id: number
@@ -51,11 +51,25 @@ export default function ProjectsPage() {
   }
 
   const toggleActive = async (p: Project) => {
-    await fetch(`/api/projects/${p.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ active: !p.active }),
-    })
+    if (!p.active) {
+      // Вмикаємо без підтвердження
+      await fetch(`/api/projects/${p.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ active: true }),
+      })
+    } else {
+      // Вимикаємо — попередження
+      if (!confirm(
+        `Вимкнути проект "${p.name}"?\n\n` +
+        `Всі ${p._count.vehicles} авто цього проекту отримають статус ПРОСТРОЧЕНО.`
+      )) return
+      await fetch(`/api/projects/${p.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ active: false }),
+      })
+    }
     load()
   }
 

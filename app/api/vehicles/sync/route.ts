@@ -1,5 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { NextRequest, NextResponse } from 'next/server'
 
 const DEFAULT_LIMIT = 500
 const MAX_LIMIT = 1000
@@ -32,6 +32,7 @@ export async function GET(request: NextRequest) {
       plate: true,
       digits: true,
       company: true,
+      projectId: true,
       contactName: true,
       contactPhone: true,
       accessType: true,

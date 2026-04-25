@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server'
 
-const PROTECTED_PATHS = ['/admin', '/api/vehicles', '/api/import', '/api/emergency', '/api/projects']
+const PROTECTED_PATHS = ['/admin', '/api/vehicles', '/api/import', '/api/emergency', '/api/projects', '/api/logs']
 
 // Публічні API для операторів (без авторизації):
 // /api/vehicles/sync  — синхронізація авто
@@ -13,7 +13,7 @@ const PROTECTED_PATHS = ['/admin', '/api/vehicles', '/api/import', '/api/emergen
 // /api/import         — імпорт Excel
 // /api/logs (GET)     — перегляд логів адміном — захищаємо в самому route handler
 
-const PUBLIC_EXCEPTIONS = ['/api/vehicles/sync', '/api/emergency/sync']
+const PUBLIC_EXCEPTIONS = ['/api/vehicles/sync', '/api/emergency/sync', '/api/logs/batch', '/api/checkpoint']
 
 function isProtected(pathname: string): boolean {
   if (PUBLIC_EXCEPTIONS.some(p => pathname.startsWith(p))) return false
@@ -69,5 +69,6 @@ export const config = {
     '/api/import/:path*',
     '/api/emergency/:path*',
     '/api/projects/:path*',
+    '/api/logs/:path*',
   ],
 }

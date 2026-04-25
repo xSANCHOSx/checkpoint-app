@@ -5,9 +5,10 @@ export interface LocalVehicle {
   plate: string
   digits: string
   company: string
+  projectId?: number | null
   contactName: string | null
   contactPhone: string | null
-  accessType: 'PERMANENT' | 'TEMPORARY'
+  accessType: 'PERMANENT' | 'TEMPORARY' | 'SINGLE_USE'
   expiresAt: string | null  // ISO string
   isExpired: boolean
   note: string | null

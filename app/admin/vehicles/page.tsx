@@ -1,17 +1,18 @@
 'use client'
-import { useEffect, useState, useCallback } from 'react'
-import Link from 'next/link'
-import { VehicleTable } from '@/components/admin/VehicleTable'
-import { VehicleForm } from '@/components/admin/VehicleForm'
-import { ExcelImport } from '@/components/admin/ExcelImport'
 import { BulkExtendModal } from '@/components/admin/BulkExtendModal'
-import { localDb, type LocalVehicle } from '@/lib/localDb'
+import { ExcelImport } from '@/components/admin/ExcelImport'
+import { VehicleForm } from '@/components/admin/VehicleForm'
+import { VehicleTable } from '@/components/admin/VehicleTable'
 import { useOnlineStatus } from '@/hooks/useOnlineStatus'
+import { localDb, type LocalVehicle } from '@/lib/localDb'
+import Link from 'next/link'
+import { useCallback, useEffect, useState } from 'react'
 
 export interface Vehicle {
   id: number
   plate: string
   company: string
+  projectId?: number | null
   contactName: string | null
   contactPhone: string | null
   accessType: 'PERMANENT' | 'TEMPORARY' | 'SINGLE_USE'

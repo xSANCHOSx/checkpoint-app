@@ -1,5 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { NextRequest, NextResponse } from 'next/server'
 
 function checkAdminAuth(request: NextRequest): boolean {
   const authHeader = request.headers.get('authorization') || ''
@@ -36,13 +36,6 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
-  if (!checkAdminAuth(request)) {
-    return new NextResponse('Unauthorized', {
-      status: 401,
-      headers: { 'WWW-Authenticate': 'Basic realm="KPP Admin"', 'Cache-Control': 'no-store' },
-    })
-  }
-
   const { searchParams } = request.nextUrl
   const page = Math.max(1, parseInt(searchParams.get('page') || '1'))
   const limit = Math.min(200, parseInt(searchParams.get('limit') || '50'))
