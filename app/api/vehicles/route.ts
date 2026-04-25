@@ -1,4 +1,4 @@
-jimport { extractDigits, normalizePlate } from '@/lib/plateUtils'
+import { extractDigits, normalizePlate } from '@/lib/plateUtils'
 import { prisma } from '@/lib/prisma'
 import { NextRequest, NextResponse } from 'next/server'
 
