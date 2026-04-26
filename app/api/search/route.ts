@@ -1,6 +1,6 @@
 import { getDaysLeft, getDaysOverdue, getVehicleStatus } from '@/lib/plateUtils'
 import { prisma } from '@/lib/prisma'
-import { Vehicle } from '@prisma/client'   
+import { Vehicle } from '@prisma/client'
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function GET(request: NextRequest) {
@@ -10,8 +10,12 @@ export async function GET(request: NextRequest) {
     return NextResponse.json([])
   }
 
+  const isDigitsOnly = /^\d+$/.test(q)
+
   const vehicles = await prisma.vehicle.findMany({
-    where: { digits: { contains: q } },
+    where: isDigitsOnly
+      ? { digits: { contains: q } }
+      : { plate: { contains: q.toUpperCase() } },
     orderBy: { company: 'asc' },
     take: 10,
   })

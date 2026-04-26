@@ -14,7 +14,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   const body = await request.json()
   const name = typeof body.name === 'string' ? body.name.trim() : ''
-  if (!name) return NextResponse.json({ error: 'Назва обов'язкова' }, { status: 400 })
+  if (!name) return NextResponse.json({ error: "Назва обов'язкова" }, { status: 400 })
 
   const project = await prisma.project.create({
     data: {

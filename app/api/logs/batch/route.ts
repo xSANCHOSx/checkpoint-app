@@ -1,5 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { NextRequest, NextResponse } from 'next/server'
 
 const MAX_LOGS_PER_REQUEST = 500
 const MAX_BODY_BYTES = 1 * 1024 * 1024 // 1 MB
@@ -74,6 +74,18 @@ export async function POST(request: NextRequest) {
     })),
     skipDuplicates: true,
   })
+
+  // SINGLE_USE: expire vehicles that were ALLOWED offline
+  const allowedIds = validLogs
+    .filter(l => l.result === 'ALLOWED' && typeof l.vehicleId === 'number')
+    .map(l => l.vehicleId as number)
+
+  if (allowedIds.length > 0) {
+    await prisma.vehicle.updateMany({
+      where: { id: { in: allowedIds }, accessType: 'SINGLE_USE' },
+      data: { isExpired: true },
+    })
+  }
 
   return NextResponse.json({ saved: saved.count })
 }

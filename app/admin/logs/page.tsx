@@ -1,7 +1,7 @@
 'use client'
-import { useEffect, useState, useCallback } from 'react'
-import Link from 'next/link'
 import { LogList } from '@/components/LogList'
+import Link from 'next/link'
+import { useCallback, useEffect, useState } from 'react'
 
 export interface LogEntry {
   id: number
@@ -18,9 +18,11 @@ export default function LogsPage() {
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10))
+  const [plate, setPlate] = useState('')
   const [loading, setLoading] = useState(true)
 
   const LIMIT = 50
+  const today = new Date().toISOString().slice(0, 10)
 
   const fetchLogs = useCallback(async () => {
     setLoading(true)
@@ -29,6 +31,7 @@ export default function LogsPage() {
         page: String(page),
         limit: String(LIMIT),
         ...(date && { date }),
+        ...(plate && { plate }),
       })
       const res = await fetch(`/api/logs?${params}`)
       const data = await res.json()
@@ -37,7 +40,7 @@ export default function LogsPage() {
     } finally {
       setLoading(false)
     }
-  }, [page, date])
+  }, [page, date, plate])
 
   useEffect(() => {
     fetchLogs()
@@ -55,12 +58,31 @@ export default function LogsPage() {
             <h1 className="text-xl font-bold text-gray-800">📋 Журнал проїздів</h1>
             <span className="text-sm text-gray-500">({total})</span>
           </div>
-          <input
-            type="date"
-            value={date}
-            onChange={e => { setDate(e.target.value); setPage(1) }}
-            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
+          <div className="flex items-center gap-2 flex-wrap">
+            <input
+              type="text"
+              value={plate}
+              onChange={e => { setPlate(e.target.value.toUpperCase()); setPage(1) }}
+              placeholder="Номер авто..."
+              className="px-3 py-2 border border-gray-300 rounded-lg text-sm w-36 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
+            />
+            <div className="flex items-center gap-1">
+              {date !== today && (
+                <button
+                  onClick={() => { setDate(today); setPage(1) }}
+                  className="px-3 py-2 text-xs border border-blue-200 text-blue-600 rounded-lg hover:bg-blue-50"
+                >
+                  Сьогодні
+                </button>
+              )}
+              <input
+                type="date"
+                value={date}
+                onChange={e => { setDate(e.target.value); setPage(1) }}
+                className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          </div>
         </div>
       </header>
 

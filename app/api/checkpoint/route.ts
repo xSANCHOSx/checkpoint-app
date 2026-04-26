@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
       where: { id: vehicleId },
       select: { accessType: true },
     })
-    if (vehicle?.accessType === 'SINGLE_USE') {
+    if ((vehicle?.accessType as string) === 'SINGLE_USE') {
       await prisma.vehicle.update({
         where: { id: vehicleId },
         data: { isExpired: true },

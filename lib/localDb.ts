@@ -5,9 +5,10 @@ export interface LocalVehicle {
   plate: string
   digits: string
   company: string
+  projectId?: number | null
   contactName: string | null
   contactPhone: string | null
-  accessType: 'PERMANENT' | 'TEMPORARY'
+  accessType: 'PERMANENT' | 'TEMPORARY' | 'SINGLE_USE'
   expiresAt: string | null  // ISO string
   isExpired: boolean
   note: string | null
@@ -59,9 +60,18 @@ class CheckpointDB extends Dexie {
 export const localDb = new CheckpointDB()
 
 // Пошук за цифрами
-export async function searchLocal(digits: string): Promise<LocalVehicle[]> {
-  if (digits.length < 2) return []
-  return localDb.vehicles.filter(v => v.digits.includes(digits)).toArray()
+export async function searchLocal(query: string): Promise<LocalVehicle[]> {
+  if (query.length < 2) return []
+  const q = query.toUpperCase()
+  const isDigitsOnly = /^\d+$/.test(q)
+
+  if (isDigitsOnly) {
+    // Пошук по цифрах номера: "1234" знайде "AA1234BB"
+    return localDb.vehicles.filter(v => v.digits.includes(q)).toArray()
+  } else {
+    // Пошук по повному номеру (іменні + звичайні з літерами)
+    return localDb.vehicles.filter(v => v.plate.includes(q)).toArray()
+  }
 }
 
 // Збереження офлайн-логу
@@ -87,7 +97,14 @@ export async function getPendingCount(): Promise<number> {
 }
 
 // Пошук в аварійному списку
-export async function searchEmergency(digits: string): Promise<LocalEmergencyVehicle[]> {
-  if (digits.length < 2) return []
-  return localDb.emergencyVehicles.filter(v => v.digits.includes(digits)).toArray()
+export async function searchEmergency(query: string): Promise<LocalEmergencyVehicle[]> {
+  if (query.length < 2) return []
+  const q = query.toUpperCase()
+  const isDigitsOnly = /^\d+$/.test(q)
+
+  if (isDigitsOnly) {
+    return localDb.emergencyVehicles.filter(v => v.digits.includes(q)).toArray()
+  } else {
+    return localDb.emergencyVehicles.filter(v => v.plate.includes(q)).toArray()
+  }
 }

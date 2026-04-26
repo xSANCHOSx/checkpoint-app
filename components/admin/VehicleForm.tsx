@@ -1,6 +1,12 @@
 'use client'
-import { useState } from 'react'
 import type { Vehicle } from '@/app/admin/vehicles/page'
+import { useEffect, useState } from 'react'
+
+interface Project {
+  id: number
+  name: string
+  active: boolean
+}
 
 interface Props {
   vehicle: Vehicle | null
@@ -14,6 +20,7 @@ export function VehicleForm({ vehicle, onClose, onSaved }: Props) {
   const [form, setForm] = useState({
     plate:        vehicle?.plate        ?? '',
     company:      vehicle?.company      ?? '',
+    projectId:    (vehicle as (Vehicle & { projectId?: number | null }) | null)?.projectId ?? null as number | null,
     contactName:  vehicle?.contactName  ?? '',
     contactPhone: vehicle?.contactPhone ?? '',
     accessType:   vehicle?.accessType   ?? 'PERMANENT',
@@ -22,6 +29,15 @@ export function VehicleForm({ vehicle, onClose, onSaved }: Props) {
       : '',
     note:         vehicle?.note         ?? '',
   })
+
+  const [projects, setProjects] = useState<Project[]>([])
+
+  useEffect(() => {
+    fetch('/api/projects')
+      .then(r => r.json())
+      .then((data: Project[]) => setProjects(data.filter(p => p.active)))
+      .catch(() => {})
+  }, [])
 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -39,6 +55,7 @@ export function VehicleForm({ vehicle, onClose, onSaved }: Props) {
     try {
       const body = {
         ...form,
+        projectId: form.projectId ?? null,
         expiresAt: form.expiresAt || null,
         contactName: form.contactName || null,
         contactPhone: form.contactPhone || null,
@@ -97,6 +114,22 @@ export function VehicleForm({ vehicle, onClose, onSaved }: Props) {
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
+              Проект
+            </label>
+            <select
+              value={form.projectId ?? ''}
+              onChange={e => setForm(f => ({ ...f, projectId: e.target.value ? Number(e.target.value) : null }))}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">— Без проекту —</option>
+              {projects.map(p => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
               Компанія / Організація *
             </label>
             <input
@@ -129,7 +162,6 @@ export function VehicleForm({ vehicle, onClose, onSaved }: Props) {
               Використовуйте для разових поставок, гостей, підрядників.
             </div>
           )}
-          </div>
 
           {form.accessType === 'TEMPORARY' && (
             <div>

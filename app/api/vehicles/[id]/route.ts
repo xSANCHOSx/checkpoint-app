@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { extractDigits, normalizePlate } from '@/lib/plateUtils'
 import { prisma } from '@/lib/prisma'
-import { normalizePlate, extractDigits } from '@/lib/plateUtils'
+import { NextRequest, NextResponse } from 'next/server'
 
 export async function PUT(
   request: NextRequest,
@@ -18,6 +18,7 @@ export async function PUT(
       data: {
         ...(plate && { plate, digits: extractDigits(plate) }),
         company: body.company,
+        projectId: body.projectId ? Number(body.projectId) : null,
         contactName: body.contactName || null,
         contactPhone: body.contactPhone || null,
         accessType: body.accessType,

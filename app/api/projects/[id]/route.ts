@@ -1,5 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { NextRequest, NextResponse } from 'next/server'
 
 // PATCH — оновити (назва, active, note)
 export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
@@ -13,6 +13,32 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
   if ('note' in body) data.note = body.note || null
 
   const project = await prisma.project.update({ where: { id }, data })
+
+  // Якщо проект вимкнено — позначаємо всі його авто як прострочені
+  if (body.active === false) {
+    await prisma.vehicle.updateMany({
+      where: { projectId: id },
+      data: {
+        isExpired: true,
+        note: 'Проект закінчено',
+      },
+    })
+  }
+
+  // Якщо проект увімкнено — знімаємо прострочення з авто які мали примітку "Проект закінчено"
+  if (body.active === true) {
+    await prisma.vehicle.updateMany({
+      where: {
+        projectId: id,
+        note: 'Проект закінчено',
+      },
+      data: {
+        isExpired: false,
+        note: null,
+      },
+    })
+  }
+
   return NextResponse.json(project)
 }
 
