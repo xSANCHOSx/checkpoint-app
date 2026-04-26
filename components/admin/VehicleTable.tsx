@@ -1,5 +1,4 @@
 'use client'
-import { useState } from 'react'
 import type { Vehicle } from '@/app/admin/vehicles/page'
 
 interface Props {
@@ -72,6 +71,7 @@ export function VehicleTable({ vehicles, onEdit, onDelete, readOnly, selectedIds
             )}
             <th className="text-left px-4 py-3 text-gray-600 font-semibold">Номер</th>
             <th className="text-left px-4 py-3 text-gray-600 font-semibold">Компанія</th>
+            <th className="text-left px-4 py-3 text-gray-600 font-semibold hidden md:table-cell">Проект</th>
             <th className="text-left px-4 py-3 text-gray-600 font-semibold hidden md:table-cell">Тип</th>
             <th className="text-left px-4 py-3 text-gray-600 font-semibold hidden lg:table-cell">Дійсний до</th>
             <th className="text-left px-4 py-3 text-gray-600 font-semibold hidden md:table-cell">Статус</th>
@@ -82,6 +82,7 @@ export function VehicleTable({ vehicles, onEdit, onDelete, readOnly, selectedIds
           {vehicles.map((v, i) => {
             const isExpiredOrOverdue = v.isExpired || (v.expiresAt && new Date(v.expiresAt) < new Date())
             const isSelected = selectedIds?.has(v.id) ?? false
+            const projectActive = v.project?.active ?? true
 
             return (
               <tr
@@ -101,7 +102,27 @@ export function VehicleTable({ vehicles, onEdit, onDelete, readOnly, selectedIds
                   </td>
                 )}
                 <td className="px-4 py-3 font-mono font-bold text-gray-900">{v.plate}</td>
-                <td className="px-4 py-3 text-gray-700 max-w-[180px] truncate">{v.company}</td>
+                <td className="px-4 py-3 text-gray-700 max-w-[160px] truncate">{v.company}</td>
+
+                {/* Проект: сірий якщо вимкнено, відсутній якщо не призначено */}
+                <td className="px-4 py-3 hidden md:table-cell">
+                  {v.project ? (
+                    <span
+                      className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium ${
+                        projectActive
+                          ? 'bg-indigo-100 text-indigo-700'
+                          : 'bg-gray-100 text-gray-400'
+                      }`}
+                      title={projectActive ? 'Проект активний' : 'Проект вимкнено'}
+                    >
+                      {!projectActive && <span>⏸</span>}
+                      📁 {v.project.name}
+                    </span>
+                  ) : (
+                    <span className="text-gray-300 text-xs">—</span>
+                  )}
+                </td>
+
                 <td className="px-4 py-3 hidden md:table-cell">
                   <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${ACCESS_TYPE_COLORS[v.accessType] ?? 'bg-gray-100 text-gray-700'}`}>
                     {ACCESS_TYPE_LABELS[v.accessType] ?? v.accessType}

@@ -8,12 +8,22 @@ export async function GET(request: NextRequest) {
   const limit = Math.min(200, parseInt(searchParams.get('limit') || '50'))
   const filter = searchParams.get('filter')
   const search = searchParams.get('search') || ''
+  const projectId = searchParams.get('project')
 
   const where: Record<string, unknown> = {}
 
   if (filter === 'expired') where.isExpired = true
   if (filter === 'permanent') where.accessType = 'PERMANENT'
   if (filter === 'temporary') where.accessType = 'TEMPORARY'
+  if (filter === 'single') where.accessType = 'SINGLE_USE'
+
+  // Фільтр за проектом: "none" = без проекту, число = конкретний проект
+  if (projectId === 'none') {
+    where.projectId = null
+  } else if (projectId) {
+    where.projectId = parseInt(projectId)
+  }
+
   if (search) {
     where.OR = [
       { plate: { contains: search, mode: 'insensitive' } },
@@ -27,6 +37,11 @@ export async function GET(request: NextRequest) {
       skip: (page - 1) * limit,
       take: limit,
       orderBy: { createdAt: 'desc' },
+      include: {
+        project: {
+          select: { id: true, name: true, active: true },
+        },
+      },
     }),
     prisma.vehicle.count({ where }),
   ])
@@ -55,6 +70,9 @@ export async function POST(request: NextRequest) {
         expiresAt: body.expiresAt ? new Date(body.expiresAt) : null,
         note: body.note || null,
         source: 'manual',
+      },
+      include: {
+        project: { select: { id: true, name: true, active: true } },
       },
     })
     return NextResponse.json(vehicle, { status: 201 })

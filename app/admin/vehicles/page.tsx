@@ -8,11 +8,18 @@ import { localDb, type LocalVehicle } from '@/lib/localDb'
 import Link from 'next/link'
 import { useCallback, useEffect, useState } from 'react'
 
+export interface Project {
+  id: number
+  name: string
+  active: boolean
+}
+
 export interface Vehicle {
   id: number
   plate: string
   company: string
   projectId?: number | null
+  project?: Project | null
   contactName: string | null
   contactPhone: string | null
   accessType: 'PERMANENT' | 'TEMPORARY' | 'SINGLE_USE'
@@ -47,6 +54,8 @@ export default function VehiclesPage() {
   const [page, setPage] = useState(1)
   const [filter, setFilter] = useState('')
   const [search, setSearch] = useState('')
+  const [projectFilter, setProjectFilter] = useState('')
+  const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [showImport, setShowImport] = useState(false)
@@ -55,6 +64,21 @@ export default function VehiclesPage() {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
   const [bulkAction, setBulkAction] = useState<BulkAction | ''>('')
   const [showBulkModal, setShowBulkModal] = useState(false)
+
+  // Завантажуємо проекти для фільтра
+  useEffect(() => {
+    fetch('/api/projects')
+      .then(r => r.json())
+      .then((data: Project[]) => setProjects(data))
+      .catch(() => {})
+  }, [])
+
+  // Підтягуємо projectFilter з URL при першому рендері
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const proj = params.get('project')
+    if (proj) setProjectFilter(proj)
+  }, [])
 
   const fetchFromLocal = useCallback(async () => {
     let query = localDb.vehicles.toCollection()
@@ -74,11 +98,13 @@ export default function VehiclesPage() {
   const fetchFromApi = useCallback(async () => {
     const params = new URLSearchParams({
       page: String(page), limit: String(LIMIT),
-      ...(filter && { filter }), ...(search && { search }),
+      ...(filter && { filter }),
+      ...(search && { search }),
+      ...(projectFilter && { project: projectFilter }),
     })
     const res = await fetch(`/api/vehicles?${params}`)
     return res.json() as Promise<{ vehicles: Vehicle[]; total: number }>
-  }, [page, filter, search])
+  }, [page, filter, search, projectFilter])
 
   const fetchVehicles = useCallback(async () => {
     setLoading(true)
@@ -129,7 +155,11 @@ export default function VehiclesPage() {
   }
 
   const totalPages = Math.ceil(total / LIMIT)
-  const allSelected = selectedIds.size === vehicles.length && vehicles.length > 0
+
+  // Знайти вибраний проект для відображення в заголовку
+  const activeProjectName = projectFilter && projectFilter !== 'none'
+    ? projects.find(p => p.id === parseInt(projectFilter))?.name
+    : projectFilter === 'none' ? 'Без проекту' : null
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -140,6 +170,11 @@ export default function VehiclesPage() {
             <span className="text-gray-300">|</span>
             <h1 className="text-xl font-bold text-gray-800">🚗 Автомобілі</h1>
             <span className="text-sm text-gray-500">({total})</span>
+            {activeProjectName && (
+              <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">
+                📁 {activeProjectName}
+              </span>
+            )}
             {isLocal && (
               <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">
                 📴 локальна база
@@ -167,9 +202,9 @@ export default function VehiclesPage() {
           </div>
         )}
 
-        {/* WordPress-style toolbar */}
+        {/* Toolbar */}
         <div className="flex flex-wrap items-center gap-3 mb-4">
-          {/* Bulk actions — зліва як у WP */}
+          {/* Bulk actions */}
           {!isLocal && (
             <div className="flex items-center gap-2">
               <select
@@ -200,26 +235,54 @@ export default function VehiclesPage() {
             </div>
           )}
 
-          {/* Фільтри — справа */}
-          <div className="flex gap-2 ml-auto flex-wrap">
+          {/* Фільтри */}
+          <div className="flex gap-2 ml-auto flex-wrap items-center">
             <input
               type="text"
               value={search}
               onChange={e => { setSearch(e.target.value); setPage(1) }}
-              placeholder="Пошук..."
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-48"
+              placeholder="Пошук по номеру, компанії..."
+              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-52"
             />
+
+            {/* Фільтр за проектом */}
+            {!isLocal && (
+              <select
+                value={projectFilter}
+                onChange={e => { setProjectFilter(e.target.value); setPage(1) }}
+                className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">📁 Всі проекти</option>
+                <option value="none">— Без проекту</option>
+                {projects.map(p => (
+                  <option key={p.id} value={p.id}>
+                    {p.active ? '' : '⏸ '}{p.name}
+                  </option>
+                ))}
+              </select>
+            )}
+
             <select
               value={filter}
               onChange={e => { setFilter(e.target.value); setPage(1) }}
               className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              <option value="">Всі</option>
+              <option value="">Всі типи</option>
               <option value="permanent">Постійні</option>
               <option value="temporary">Тимчасові</option>
               <option value="single">Разові</option>
               <option value="expired">Прострочені</option>
             </select>
+
+            {/* Скинути всі фільтри */}
+            {(search || filter || projectFilter) && (
+              <button
+                onClick={() => { setSearch(''); setFilter(''); setProjectFilter(''); setPage(1) }}
+                className="px-3 py-2 text-sm text-gray-500 hover:text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50"
+              >
+                ✕ Скинути
+              </button>
+            )}
           </div>
         </div>
 
@@ -236,7 +299,7 @@ export default function VehiclesPage() {
           />
         )}
 
-        {/* Нижній toolbar — як у WP (дублюємо bulk actions) */}
+        {/* Нижній toolbar */}
         {!isLocal && vehicles.length > 0 && (
           <div className="flex items-center gap-2 mt-4">
             <select
@@ -258,7 +321,6 @@ export default function VehiclesPage() {
               Застосувати
             </button>
 
-            {/* Пагінація справа */}
             {total > LIMIT && (
               <div className="flex items-center gap-2 ml-auto">
                 <span className="text-sm text-gray-500">
@@ -273,7 +335,6 @@ export default function VehiclesPage() {
           </div>
         )}
 
-        {/* Верхня пагінація якщо багато записів */}
         {total > LIMIT && (
           <div className="flex justify-end mt-1 mb-4 text-sm text-gray-400">
             Сторінка {page} з {totalPages}
