@@ -1,5 +1,5 @@
 'use client'
-import { BulkExtendModal } from '@/components/admin/BulkExtendModal'
+import { BulkActionsModal } from '@/components/admin/BulkActionsModal'
 import { ExcelImport } from '@/components/admin/ExcelImport'
 import { VehicleForm } from '@/components/admin/VehicleForm'
 import { VehicleTable } from '@/components/admin/VehicleTable'
@@ -29,6 +29,17 @@ function localToVehicle(v: LocalVehicle): Vehicle {
 
 const LIMIT = 50
 
+type BulkAction = 'extend' | 'set_permanent' | 'set_project' | 'set_expired' | 'set_active' | 'delete'
+
+const BULK_OPTIONS: { value: BulkAction; label: string }[] = [
+  { value: 'extend',        label: '⏳ Продовжити термін' },
+  { value: 'set_permanent', label: '♾️ Зробити постійними' },
+  { value: 'set_project',   label: '📁 Призначити проект' },
+  { value: 'set_active',    label: '🟢 Розблокувати' },
+  { value: 'set_expired',   label: '🔴 Заблокувати' },
+  { value: 'delete',        label: '🗑 Видалити' },
+]
+
 export default function VehiclesPage() {
   const isOnline = useOnlineStatus()
   const [vehicles, setVehicles] = useState<Vehicle[]>([])
@@ -39,10 +50,11 @@ export default function VehiclesPage() {
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [showImport, setShowImport] = useState(false)
-  const [showBulk, setShowBulk] = useState(false)
   const [editVehicle, setEditVehicle] = useState<Vehicle | null>(null)
   const [isLocal, setIsLocal] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
+  const [bulkAction, setBulkAction] = useState<BulkAction | ''>('')
+  const [showBulkModal, setShowBulkModal] = useState(false)
 
   const fetchFromLocal = useCallback(async () => {
     let query = localDb.vehicles.toCollection()
@@ -71,6 +83,7 @@ export default function VehiclesPage() {
   const fetchVehicles = useCallback(async () => {
     setLoading(true)
     setSelectedIds(new Set())
+    setBulkAction('')
     try {
       if (isOnline) {
         try {
@@ -98,20 +111,25 @@ export default function VehiclesPage() {
     fetchVehicles()
   }
 
-  const handleBulkExtend = async (expiresAt: string | null) => {
+  const handleApplyBulk = () => {
+    if (!bulkAction || selectedIds.size === 0) return
+    setShowBulkModal(true)
+  }
+
+  const handleBulkConfirm = async (payload: Record<string, unknown>) => {
     const ids = Array.from(selectedIds)
     const res = await fetch('/api/vehicles/batch', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ids, expiresAt }),
+      body: JSON.stringify({ ids, ...payload }),
     })
     if (!res.ok) throw new Error('Помилка')
-    setShowBulk(false)
-    setSelectedIds(new Set())
+    setShowBulkModal(false)
     fetchVehicles()
   }
 
   const totalPages = Math.ceil(total / LIMIT)
+  const allSelected = selectedIds.size === vehicles.length && vehicles.length > 0
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -128,28 +146,14 @@ export default function VehiclesPage() {
               </span>
             )}
           </div>
-          <div className="flex gap-2 flex-wrap">
-            {/* Кнопка масового продовження */}
-            {selectedIds.size > 0 && !isLocal && (
-              <button
-                onClick={() => setShowBulk(true)}
-                className="px-3 py-2 bg-purple-50 text-purple-700 border border-purple-200 rounded-lg text-sm hover:bg-purple-100 transition-colors font-medium"
-              >
-                ⏳ Продовжити {selectedIds.size} авто
-              </button>
-            )}
-            <button
-              onClick={() => setShowImport(true)}
-              className="px-3 py-2 bg-green-50 text-green-700 border border-green-200 rounded-lg text-sm hover:bg-green-100 transition-colors"
-            >
+          <div className="flex gap-2">
+            <button onClick={() => setShowImport(true)}
+              className="px-3 py-2 bg-green-50 text-green-700 border border-green-200 rounded-lg text-sm hover:bg-green-100">
               📊 Імпорт Excel
             </button>
-            <button
-              onClick={() => { setEditVehicle(null); setShowForm(true) }}
-              className="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 transition-colors"
+            <button onClick={() => { setEditVehicle(null); setShowForm(true) }}
               disabled={isLocal}
-              title={isLocal ? 'Додавання доступне тільки онлайн' : ''}
-            >
+              className="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 disabled:opacity-40">
               + Додати
             </button>
           </div>
@@ -159,45 +163,64 @@ export default function VehiclesPage() {
       <main className="max-w-6xl mx-auto px-6 py-6">
         {isLocal && (
           <div className="mb-4 bg-orange-50 border border-orange-200 text-orange-800 rounded-xl px-4 py-3 text-sm">
-            📴 Відображається локальна копія бази. Редагування недоступне до відновлення з'єднання.
+            📴 Відображається локальна копія бази. Редагування недоступне.
           </div>
         )}
 
-        {/* Панель вибору */}
-        {selectedIds.size > 0 && (
-          <div className="mb-4 bg-purple-50 border border-purple-200 rounded-xl px-4 py-3 flex items-center justify-between">
-            <span className="text-sm text-purple-800 font-medium">
-              Обрано: {selectedIds.size} авто
-            </span>
-            <button
-              onClick={() => setSelectedIds(new Set())}
-              className="text-xs text-purple-500 hover:text-purple-700"
+        {/* WordPress-style toolbar */}
+        <div className="flex flex-wrap items-center gap-3 mb-4">
+          {/* Bulk actions — зліва як у WP */}
+          {!isLocal && (
+            <div className="flex items-center gap-2">
+              <select
+                value={bulkAction}
+                onChange={e => setBulkAction(e.target.value as BulkAction | '')}
+                disabled={selectedIds.size === 0}
+                className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:bg-gray-50"
+              >
+                <option value="">Масові дії</option>
+                {BULK_OPTIONS.map(o => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+              <button
+                onClick={handleApplyBulk}
+                disabled={!bulkAction || selectedIds.size === 0}
+                className="px-3 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Застосувати
+              </button>
+              {selectedIds.size > 0 && (
+                <span className="text-sm text-gray-500">
+                  Обрано: <strong>{selectedIds.size}</strong>
+                  <button onClick={() => setSelectedIds(new Set())}
+                    className="ml-2 text-gray-400 hover:text-gray-600">✕</button>
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* Фільтри — справа */}
+          <div className="flex gap-2 ml-auto flex-wrap">
+            <input
+              type="text"
+              value={search}
+              onChange={e => { setSearch(e.target.value); setPage(1) }}
+              placeholder="Пошук..."
+              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-48"
+            />
+            <select
+              value={filter}
+              onChange={e => { setFilter(e.target.value); setPage(1) }}
+              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              Скасувати вибір ✕
-            </button>
+              <option value="">Всі</option>
+              <option value="permanent">Постійні</option>
+              <option value="temporary">Тимчасові</option>
+              <option value="single">Разові</option>
+              <option value="expired">Прострочені</option>
+            </select>
           </div>
-        )}
-
-        {/* Фільтри */}
-        <div className="flex flex-wrap gap-3 mb-4">
-          <input
-            type="text"
-            value={search}
-            onChange={e => { setSearch(e.target.value); setPage(1) }}
-            placeholder="Пошук за номером або компанією..."
-            className="flex-1 min-w-48 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <select
-            value={filter}
-            onChange={e => { setFilter(e.target.value); setPage(1) }}
-            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="">Всі</option>
-            <option value="permanent">Постійні</option>
-            <option value="temporary">Тимчасові</option>
-            <option value="single">Разові</option>
-            <option value="expired">Прострочені</option>
-          </select>
         </div>
 
         {loading ? (
@@ -213,26 +236,47 @@ export default function VehiclesPage() {
           />
         )}
 
-        {/* Пагінація */}
+        {/* Нижній toolbar — як у WP (дублюємо bulk actions) */}
+        {!isLocal && vehicles.length > 0 && (
+          <div className="flex items-center gap-2 mt-4">
+            <select
+              value={bulkAction}
+              onChange={e => setBulkAction(e.target.value as BulkAction | '')}
+              disabled={selectedIds.size === 0}
+              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none disabled:opacity-50 disabled:bg-gray-50"
+            >
+              <option value="">Масові дії</option>
+              {BULK_OPTIONS.map(o => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+            <button
+              onClick={handleApplyBulk}
+              disabled={!bulkAction || selectedIds.size === 0}
+              className="px-3 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50 disabled:opacity-40"
+            >
+              Застосувати
+            </button>
+
+            {/* Пагінація справа */}
+            {total > LIMIT && (
+              <div className="flex items-center gap-2 ml-auto">
+                <span className="text-sm text-gray-500">
+                  {(page - 1) * LIMIT + 1}–{Math.min(page * LIMIT, total)} з {total}
+                </span>
+                <button disabled={page === 1} onClick={() => setPage(p => p - 1)}
+                  className="px-3 py-2 text-sm border rounded-lg disabled:opacity-40 hover:bg-gray-50">←</button>
+                <button disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}
+                  className="px-3 py-2 text-sm border rounded-lg disabled:opacity-40 hover:bg-gray-50">→</button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Верхня пагінація якщо багато записів */}
         {total > LIMIT && (
-          <div className="flex justify-center gap-2 mt-6">
-            <button
-              disabled={page === 1}
-              onClick={() => setPage(p => p - 1)}
-              className="px-4 py-2 text-sm border rounded-lg disabled:opacity-40 hover:bg-gray-50"
-            >
-              ← Назад
-            </button>
-            <span className="px-4 py-2 text-sm text-gray-600">
-              {page} / {totalPages}
-            </span>
-            <button
-              disabled={page >= totalPages}
-              onClick={() => setPage(p => p + 1)}
-              className="px-4 py-2 text-sm border rounded-lg disabled:opacity-40 hover:bg-gray-50"
-            >
-              Далі →
-            </button>
+          <div className="flex justify-end mt-1 mb-4 text-sm text-gray-400">
+            Сторінка {page} з {totalPages}
           </div>
         )}
       </main>
@@ -250,11 +294,12 @@ export default function VehiclesPage() {
           onImported={() => { setShowImport(false); fetchVehicles() }}
         />
       )}
-      {showBulk && (
-        <BulkExtendModal
+      {showBulkModal && bulkAction && (
+        <BulkActionsModal
           count={selectedIds.size}
-          onClose={() => setShowBulk(false)}
-          onConfirm={handleBulkExtend}
+          action={bulkAction}
+          onClose={() => setShowBulkModal(false)}
+          onConfirm={handleBulkConfirm}
         />
       )}
     </div>
