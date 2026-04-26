@@ -11,6 +11,24 @@ interface Project {
   _count: { vehicles: number }
 }
 
+function Toggle({ active, onChange }: { active: boolean; onChange: () => void }) {
+  return (
+    <button
+      onClick={onChange}
+      title={active ? 'Вимкнути проект' : 'Увімкнути проект'}
+      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 ${
+        active ? 'bg-green-500' : 'bg-gray-300'
+      }`}
+    >
+      <span
+        className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+          active ? 'translate-x-6' : 'translate-x-1'
+        }`}
+      />
+    </button>
+  )
+}
+
 export default function ProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
@@ -51,33 +69,24 @@ export default function ProjectsPage() {
   }
 
   const toggleActive = async (p: Project) => {
-    if (!p.active) {
-      // включаємо без підтвердження
-      await fetch(`/api/projects/${p.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ active: true }),
-      })
-    } else {
-      // вимикаємо з попередженням
+    if (p.active) {
       if (!confirm(
         `Вимкнути проект "${p.name}"?\n\n` +
         `Всі ${p._count.vehicles} авто отримають статус ЗАБОРОНЕНО\n` +
         `та примітку "Проект закінчено".`
       )) return
-
-      await fetch(`/api/projects/${p.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ active: false }),
-      })
     }
+
+    await fetch(`/api/projects/${p.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ active: !p.active }),
+    })
     load()
   }
 
   const handleDelete = async (p: Project) => {
     const hasVehicles = p._count.vehicles > 0
-
     let deleteVehicles = false
     if (hasVehicles) {
       deleteVehicles = confirm(
@@ -107,7 +116,6 @@ export default function ProjectsPage() {
 
       <main className="max-w-3xl mx-auto px-6 py-6 space-y-6">
 
-        {/* Пояснення */}
         <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-sm text-blue-800">
           <strong>Логіка:</strong> вимкнений проект → авто = <strong>ЗАБОРОНЕНО</strong> + "Проект закінчено". При повторному вмиканні — відновлення.
         </div>
@@ -120,6 +128,7 @@ export default function ProjectsPage() {
               type="text"
               value={name}
               onChange={e => setName(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleAdd()}
               placeholder="Назва проекту"
               className="flex-1 min-w-48 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
@@ -156,39 +165,45 @@ export default function ProjectsPage() {
                 <tr>
                   <th className="text-left px-4 py-3 font-semibold text-gray-600">Проект</th>
                   <th className="text-left px-4 py-3 font-semibold text-gray-600">Авто</th>
-                  <th className="text-center px-4 py-3 font-semibold text-gray-600">Статус</th>
+                  <th className="text-center px-4 py-3 font-semibold text-gray-600">Активний</th>
                   <th className="text-right px-4 py-3 font-semibold text-gray-600">Дії</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {projects.map(p => (
-                  <tr key={p.id} className={`hover:bg-gray-50 ${!p.active ? 'opacity-60' : ''}`}>
+                  <tr key={p.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3">
-                      <div className="font-medium text-gray-800">{p.name}</div>
-                      {p.note && <div className="text-xs text-gray-400 mt-0.5">{p.note}</div>}
+                      {/* Назва завжди видна, сіра коли вимкнено */}
+                      <div className={`font-medium ${p.active ? 'text-gray-800' : 'text-gray-400'}`}>
+                        {p.name}
+                        {!p.active && (
+                          <span className="ml-2 text-xs font-normal text-gray-400">(вимкнено)</span>
+                        )}
+                      </div>
+                      {p.note && (
+                        <div className={`text-xs mt-0.5 ${p.active ? 'text-gray-400' : 'text-gray-300'}`}>
+                          {p.note}
+                        </div>
+                      )}
                     </td>
 
                     <td className="px-4 py-3 text-gray-600">
                       <Link
                         href={`/admin/vehicles?project=${p.id}`}
-                        className="hover:text-blue-600 underline decoration-dotted"
+                        className={`underline decoration-dotted ${p.active ? 'hover:text-blue-600' : 'text-gray-400 hover:text-gray-500'}`}
                       >
                         {p._count.vehicles} авто
                       </Link>
                     </td>
 
-                    <td className="px-4 py-3 text-center">
-                      <button
-                        onClick={() => toggleActive(p)}
-                        title={p.active ? 'Вимкнути проект' : 'Увімкнути проект'}
-                        className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold transition-colors ${
-                          p.active
-                            ? 'bg-green-100 text-green-700 hover:bg-red-100 hover:text-red-700'
-                            : 'bg-red-100 text-red-700 hover:bg-green-100 hover:text-green-700'
-                        }`}
-                      >
-                        {p.active ? '✓ Активний' : '✗ Вимкнено'}
-                      </button>
+                    {/* Toggle switch */}
+                    <td className="px-4 py-3">
+                      <div className="flex items-center justify-center gap-2">
+                        <Toggle active={p.active} onChange={() => toggleActive(p)} />
+                        <span className={`text-xs ${p.active ? 'text-green-600' : 'text-gray-400'}`}>
+                          {p.active ? 'Так' : 'Ні'}
+                        </span>
+                      </div>
                     </td>
 
                     <td className="px-4 py-3 text-right">
