@@ -20,17 +20,17 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
       where: { projectId: id },
       data: {
         isExpired: true,
-        note: `Проект "${project.name}" вимкнено`,
+        note: 'Проект закінчено',
       },
     })
   }
 
-  // Якщо проект увімкнено — знімаємо прострочення з авто які мали цю примітку
+  // Якщо проект увімкнено — знімаємо прострочення з авто які мали примітку "Проект закінчено"
   if (body.active === true) {
     await prisma.vehicle.updateMany({
       where: {
         projectId: id,
-        note: `Проект "${project.name}" вимкнено`,
+        note: 'Проект закінчено',
       },
       data: {
         isExpired: false,
