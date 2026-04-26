@@ -1,8 +1,8 @@
 'use client'
-import { useState } from 'react'
+import { useOnlineStatus } from '@/hooks/useOnlineStatus'
 import type { SearchResult } from '@/hooks/useSearch'
 import { savePendingLog } from '@/lib/localDb'
-import { useOnlineStatus } from '@/hooks/useOnlineStatus'
+import { useState } from 'react'
 
 interface Props {
   vehicle: SearchResult
@@ -67,42 +67,41 @@ export function VehicleCard({ vehicle, onLogged }: Props) {
       ? SINGLE_USE_USED_CONFIG
       : STATUS_CONFIG[vehicle.status]
 
-  async function handleLog() {
-    if (logging || logged) return
-    setLogging(true)
+async function handleLog() {
+  if (logging || logged) return
+  setLogging(true)
 
-    const logData = {
-      plate: vehicle.plate,
-      vehicleId: vehicle.id,
-      result: config.result,
-      operatorId: null,
-      note: null,
-      timestamp: new Date().toISOString(),
-    }
-
-    try {
-      if (isOnline) {
-        await fetch('/api/checkpoint', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(logData),
-        })
-      } else {
-        await savePendingLog(logData)
-      }
-      setLogged(true)
-      onLogged?.()
-      setTimeout(() => setLogged(false), 3000)
-    } catch {
-      // тихо провалюємось, спробуємо офлайн
-      await savePendingLog(logData)
-      setLogged(true)
-      onLogged?.()
-      setTimeout(() => setLogged(false), 3000)
-    } finally {
-      setLogging(false)
-    }
+  const logData = {
+    plate: vehicle.plate,
+    // Екстрені авто не є Vehicle — vehicleId має бути null
+    vehicleId: vehicle.isEmergency ? null : vehicle.id,
+    result: config.result,
+    operatorId: null,
+    note: vehicle.isEmergency ? 'Екстрений список' : null,
+    timestamp: new Date().toISOString(),
   }
+
+  try {
+    if (isOnline) {
+      await fetch('/api/checkpoint', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(logData),
+      })
+    } else {
+      await savePendingLog(logData)
+    }
+    setLogged(true)
+    onLogged?.()
+    // Без setTimeout — кнопка залишається "✓ Записано" до нового пошуку
+  } catch {
+    await savePendingLog(logData)
+    setLogged(true)
+    onLogged?.()
+  } finally {
+    setLogging(false)
+  }
+}
 
   return (
     <div className={`rounded-xl border-2 p-4 mb-3 ${config.bg} transition-all`}>
