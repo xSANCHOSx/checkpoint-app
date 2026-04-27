@@ -14,29 +14,39 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 
   const project = await prisma.project.update({ where: { id }, data })
 
-  // Якщо проект вимкнено — позначаємо всі його авто як прострочені
+  // Якщо проект вимкнено — позначаємо авто як прострочені та ДОПИСУЄМО суфікс до примітки
   if (body.active === false) {
-    await prisma.vehicle.updateMany({
-      where: { projectId: id },
-      data: {
-        isExpired: true,
-        note: 'Проект закінчено',
-      },
-    })
+    await prisma.$executeRaw`
+      UPDATE "Vehicle"
+      SET
+        "isExpired" = true,
+        note = CASE
+          WHEN note IS NULL OR note = ''
+            THEN 'Проект закінчено'
+          WHEN note NOT LIKE '% | Проект закінчено'
+            THEN note || ' | Проект закінчено'
+          ELSE note
+        END
+      WHERE "projectId" = ${id}
+    `
   }
 
-  // Якщо проект увімкнено — знімаємо прострочення з авто які мали примітку "Проект закінчено"
+  // Якщо проект увімкнено — знімаємо прострочення та ВИДАЛЯЄМО лише суфікс
   if (body.active === true) {
-    await prisma.vehicle.updateMany({
-      where: {
-        projectId: id,
-        note: 'Проект закінчено',
-      },
-      data: {
-        isExpired: false,
-        note: null,
-      },
-    })
+    await prisma.$executeRaw`
+      UPDATE "Vehicle"
+      SET
+        "isExpired" = false,
+        note = CASE
+          WHEN note = 'Проект закінчено'
+            THEN NULL
+          WHEN note LIKE '% | Проект закінчено'
+            THEN LEFT(note, LENGTH(note) - LENGTH(' | Проект закінчено'))
+          ELSE note
+        END
+      WHERE "projectId" = ${id}
+        AND (note = 'Проект закінчено' OR note LIKE '% | Проект закінчено')
+    `
   }
 
   return NextResponse.json(project)
