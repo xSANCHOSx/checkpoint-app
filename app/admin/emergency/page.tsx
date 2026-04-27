@@ -52,7 +52,7 @@ export default function EmergencyPage() {
   }
 
   const handleDelete = async (id: number, p: string) => {
-    if (!confirm(`Видалити ${p} з аварійного списку?`)) return
+    if (!confirm(`Видалити ${p} з VIP списку?`)) return
     await fetch(`/api/emergency/${id}`, { method: 'DELETE' })
     load()
   }
@@ -63,7 +63,7 @@ export default function EmergencyPage() {
         <div className="max-w-3xl mx-auto flex items-center gap-3">
           <Link href="/admin" className="text-gray-400 hover:text-gray-600 text-sm">← Адмін</Link>
           <span className="text-gray-300">|</span>
-          <h1 className="text-xl font-bold text-gray-800">🚨 Аварійний список</h1>
+          <h1 className="text-xl font-bold text-gray-800">👑 VIP список</h1>
           <span className="text-sm text-gray-500 bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full">
             {vehicles.length} авто
           </span>
@@ -75,7 +75,7 @@ export default function EmergencyPage() {
         {/* Пояснення */}
         <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-sm text-blue-800">
           🚨 Авто з цього списку <strong>завжди отримують дозвіл</strong> незалежно від основної бази.
-          Використовуйте для: директора, охорони, ДСНС, швидкої.
+          Використовуйте для: директора, VIP-персон, охорони, ДСНС, швидкої.
         </div>
 
         {/* Форма додавання */}
@@ -115,7 +115,7 @@ export default function EmergencyPage() {
           ) : vehicles.length === 0 ? (
             <div className="text-center py-12 text-gray-400">
               <div className="text-4xl mb-2">🚨</div>
-              <div>Аварійний список порожній</div>
+              <div>VIP список порожній</div>
             </div>
           ) : (
             <table className="w-full text-sm">

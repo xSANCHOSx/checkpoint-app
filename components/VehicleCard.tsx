@@ -34,10 +34,10 @@ const STATUS_CONFIG = {
 }
 
 const EMERGENCY_CONFIG = {
-  bg: 'bg-blue-50 border-blue-400 border-2',
-  badge: 'bg-blue-600 text-white',
-  icon: '🚨',
-  label: 'АВАРІЙНИЙ СПИСОК',
+  bg: 'bg-amber-50 border-amber-400 border-2',
+  badge: 'bg-amber-500 text-white',
+  icon: '👑',
+  label: 'VIP',
   result: 'ALLOWED' as const,
 }
 
@@ -144,6 +144,19 @@ async function handleLog() {
             <div className="text-sm text-gray-400 mt-1 truncate">
               👤 {vehicle.contactName}
               {vehicle.contactPhone && ` · ${vehicle.contactPhone}`}
+            </div>
+          )}
+
+          {/* Проект */}
+          {vehicle.projectName && (
+            <div className={`text-xs mt-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-medium ${
+              vehicle.projectActive === false
+                ? 'bg-gray-100 text-gray-400'
+                : 'bg-indigo-100 text-indigo-700'
+            }`}>
+              {vehicle.projectActive === false && <span>⏸</span>}
+              📁 {vehicle.projectName}
+              {vehicle.projectActive === false && <span className="ml-1">(вимкнено)</span>}
             </div>
           )}
 

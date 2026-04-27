@@ -69,14 +69,14 @@ export default function AdminPage() {
             </p>
           </Link>
 
-          {/* Аварійний список */}
+          {/* VIP список */}
           <Link
             href="/admin/emergency"
             className="bg-white rounded-xl border border-blue-200 p-6 hover:shadow-md transition-shadow group"
           >
-            <div className="text-3xl mb-3">🚨</div>
+            <div className="text-3xl mb-3">👑</div>
             <h2 className="text-lg font-semibold text-gray-800 group-hover:text-blue-600 transition-colors">
-              Аварійний список
+              VIP список
             </h2>
             <p className="text-sm text-gray-500 mt-1">
               Авто що завжди пропускаються. Директор, охорона, ДСНС.
