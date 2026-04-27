@@ -16,9 +16,9 @@ function cleanup() {
   const now = Date.now()
   if (now - lastCleanup < 5 * 60 * 1000) return
   lastCleanup = now
-  for (const [key, entry] of store.entries()) {
-    if (entry.resetAt < now) store.delete(key)
-  }
+  store.forEach((entry, key) => {
+  if (entry.resetAt < now) store.delete(key)
+})
 }
 
 export interface RateLimitResult {
