@@ -17,6 +17,8 @@ export interface SearchResult {
   daysOverdue: number | null
   note: string | null
   isEmergency?: boolean
+  projectName?: string | null
+  projectActive?: boolean
 }
 
 export function useSearch() {
@@ -36,7 +38,7 @@ export function useSearch() {
       const emergencyResults: SearchResult[] = emergency.map(e => ({
         id: e.id,
         plate: e.plate,
-        company: '🚨 Аварійний список',
+        company: '👑 VIP список',
         contactName: null,
         contactPhone: null,
         accessType: 'PERMANENT',

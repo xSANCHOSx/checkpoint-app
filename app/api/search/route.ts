@@ -1,6 +1,5 @@
 import { getDaysLeft, getDaysOverdue, getVehicleStatus } from '@/lib/plateUtils'
 import { prisma } from '@/lib/prisma'
-import { Vehicle } from '@prisma/client'
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function GET(request: NextRequest) {
@@ -20,6 +19,7 @@ export async function GET(request: NextRequest) {
         : { plate: { contains: q.toUpperCase() } },
       orderBy: { company: 'asc' },
       take: 10,
+      include: { project: { select: { name: true, active: true } } },
     }),
     prisma.emergencyVehicle.findMany({
       where: isDigitsOnly
@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
     }),
   ])
 
-  const regularResults = vehicles.map((v: Vehicle) => ({
+  const regularResults = vehicles.map((v) => ({
     id: v.id,
     plate: v.plate,
     company: v.company,
@@ -44,12 +44,14 @@ export async function GET(request: NextRequest) {
     daysOverdue: getDaysOverdue(v.expiresAt),
     note: v.note,
     isEmergency: false,
+    projectName: v.project?.name ?? null,
+    projectActive: v.project?.active ?? null,
   }))
 
   const emergencyResults = emergencyVehicles.map(e => ({
     id: e.id,
     plate: e.plate,
-    company: e.addedBy ? `Екстрений (${e.addedBy})` : 'Екстрений список',
+    company: e.addedBy ? `VIP (${e.addedBy})` : 'VIP список',
     contactName: null,
     contactPhone: null,
     accessType: 'PERMANENT' as const,

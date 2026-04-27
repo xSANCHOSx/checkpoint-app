@@ -101,8 +101,8 @@ export function VehicleTable({ vehicles, onEdit, onDelete, readOnly, selectedIds
                     />
                   </td>
                 )}
-                <td className="px-4 py-3 font-mono font-bold text-gray-900">{v.plate}</td>
-                <td className="px-4 py-3 text-gray-700 max-w-[160px] truncate">{v.company}</td>
+                <td className="px-4 py-3 font-mono font-bold text-gray-900" style={!projectActive ? {textDecoration: 'line-through', color: '#9ca3af'} : {}}>{v.plate}</td>
+                <td className="px-4 py-3 text-gray-700 max-w-[160px] truncate" style={!projectActive ? {textDecoration: 'line-through', color: '#9ca3af'} : {}}>{v.company}</td>
 
                 {/* Проект: сірий якщо вимкнено, відсутній якщо не призначено */}
                 <td className="px-4 py-3 hidden md:table-cell">
