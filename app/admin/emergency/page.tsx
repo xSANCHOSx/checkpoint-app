@@ -1,7 +1,7 @@
 'use client'
-import { useState, useEffect } from 'react'
-import Link from 'next/link'
+import { AdminHeader } from '@/components/admin/AdminHeader'
 import { normalizePlate } from '@/lib/plateUtils'
+import { useEffect, useState } from 'react'
 
 interface EmergencyVehicle {
   id: number
@@ -59,16 +59,7 @@ export default function EmergencyPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-200 px-6 py-4 shadow-sm">
-        <div className="max-w-3xl mx-auto flex items-center gap-3">
-          <Link href="/admin" className="text-gray-400 hover:text-gray-600 text-sm">← Адмін</Link>
-          <span className="text-gray-300">|</span>
-          <h1 className="text-xl font-bold text-gray-800">👑 VIP список</h1>
-          <span className="text-sm text-gray-500 bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full">
-            {vehicles.length} авто
-          </span>
-        </div>
-      </header>
+      <AdminHeader title="👑 VIP список" />
 
       <main className="max-w-3xl mx-auto px-6 py-6 space-y-6">
 

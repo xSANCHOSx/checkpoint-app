@@ -1,15 +1,14 @@
 'use client'
-import { useState, useRef, useCallback } from 'react'
-import Link from 'next/link'
-import * as XLSX from 'xlsx'
+import { AdminHeader } from '@/components/admin/AdminHeader'
 import {
-  parseTemplateMode,
-  parseCustomMode,
   getSheetNames,
+  parseCustomMode,
+  parseTemplateMode,
+  type CustomConfig,
   type ParsedSheet,
   type TemplateConfig,
-  type CustomConfig,
 } from '@/lib/excelParserCustom'
+import { useCallback, useRef, useState } from 'react'
 
 // ─── Типи ─────────────────────────────────────────────────────────────────────
 
@@ -157,13 +156,7 @@ export default function ImportPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-200 px-6 py-4 shadow-sm">
-        <div className="max-w-5xl mx-auto flex items-center gap-3">
-          <Link href="/admin" className="text-gray-400 hover:text-gray-600 text-sm">← Адмін</Link>
-          <span className="text-gray-300">|</span>
-          <h1 className="text-xl font-bold text-gray-800">📊 Імпорт Excel</h1>
-        </div>
-      </header>
+            <AdminHeader title="📊 Імпорт Excel" />
 
       <main className="max-w-5xl mx-auto px-6 py-8 space-y-6">
 

@@ -1,11 +1,11 @@
 'use client'
+import { AdminHeader } from '@/components/admin/AdminHeader'
 import { BulkActionsModal } from '@/components/admin/BulkActionsModal'
 import { ExcelImport } from '@/components/admin/ExcelImport'
 import { VehicleForm } from '@/components/admin/VehicleForm'
 import { VehicleTable } from '@/components/admin/VehicleTable'
 import { useOnlineStatus } from '@/hooks/useOnlineStatus'
 import { localDb, type LocalVehicle } from '@/lib/localDb'
-import Link from 'next/link'
 import { useCallback, useEffect, useState } from 'react'
 
 export interface Project {
@@ -163,12 +163,10 @@ export default function VehiclesPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-200 px-6 py-4 shadow-sm">
-        <div className="flex items-center justify-between max-w-6xl mx-auto">
-          <div className="flex items-center gap-3">
-            <Link href="/admin" className="text-gray-400 hover:text-gray-600 text-sm">← Адмін</Link>
-            <span className="text-gray-300">|</span>
-            <h1 className="text-xl font-bold text-gray-800">🚗 Автомобілі</h1>
+            <AdminHeader
+        title="🚗 Автомобілі"
+        actions={
+          <>
             <span className="text-sm text-gray-500">({total})</span>
             {activeProjectName && (
               <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">
@@ -180,8 +178,6 @@ export default function VehiclesPage() {
                 📴 локальна база
               </span>
             )}
-          </div>
-          <div className="flex gap-2">
             <button onClick={() => setShowImport(true)}
               className="px-3 py-2 bg-green-50 text-green-700 border border-green-200 rounded-lg text-sm hover:bg-green-100">
               📊 Імпорт Excel
@@ -191,9 +187,9 @@ export default function VehiclesPage() {
               className="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 disabled:opacity-40">
               + Додати
             </button>
-          </div>
-        </div>
-      </header>
+          </>
+        }
+      />
 
       <main className="max-w-6xl mx-auto px-6 py-6">
         {isLocal && (

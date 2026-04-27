@@ -1,6 +1,6 @@
 'use client'
 import { LogList } from '@/components/LogList'
-import Link from 'next/link'
+import { AdminHeader } from '@/components/admin/AdminHeader'
 import { useCallback, useEffect, useState } from 'react'
 
 export interface LogEntry {
@@ -48,43 +48,7 @@ export default function LogsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-200 px-6 py-4 shadow-sm">
-        <div className="flex items-center justify-between max-w-5xl mx-auto">
-          <div className="flex items-center gap-3">
-            <Link href="/admin" className="text-gray-400 hover:text-gray-600 text-sm">
-              ← Адмін
-            </Link>
-            <span className="text-gray-300">|</span>
-            <h1 className="text-xl font-bold text-gray-800">📋 Журнал проїздів</h1>
-            <span className="text-sm text-gray-500">({total})</span>
-          </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <input
-              type="text"
-              value={plate}
-              onChange={e => { setPlate(e.target.value.toUpperCase()); setPage(1) }}
-              placeholder="Номер авто..."
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm w-36 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
-            />
-            <div className="flex items-center gap-1">
-              {date !== today && (
-                <button
-                  onClick={() => { setDate(today); setPage(1) }}
-                  className="px-3 py-2 text-xs border border-blue-200 text-blue-600 rounded-lg hover:bg-blue-50"
-                >
-                  Сьогодні
-                </button>
-              )}
-              <input
-                type="date"
-                value={date}
-                onChange={e => { setDate(e.target.value); setPage(1) }}
-                className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-          </div>
-        </div>
-      </header>
+            <AdminHeader title="📋 Журнал проїздів" />
 
       <main className="max-w-5xl mx-auto px-6 py-6">
         {loading ? (

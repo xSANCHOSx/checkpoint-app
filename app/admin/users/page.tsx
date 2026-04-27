@@ -1,6 +1,6 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
-import Link from 'next/link'
+import { AdminHeader } from '@/components/admin/AdminHeader'
+import { useCallback, useEffect, useState } from 'react'
 
 interface User {
   id: number
@@ -117,13 +117,7 @@ export default function UsersPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-200 px-6 py-4 shadow-sm">
-        <div className="max-w-3xl mx-auto flex items-center gap-3">
-          <Link href="/admin" className="text-gray-400 hover:text-gray-600 text-sm">← Адмін</Link>
-          <span className="text-gray-300">|</span>
-          <h1 className="text-xl font-bold text-gray-800">👥 Користувачі</h1>
-        </div>
-      </header>
+      <AdminHeader title="👥 Користувачі" />
 
       <main className="max-w-3xl mx-auto px-6 py-6 space-y-6">
 

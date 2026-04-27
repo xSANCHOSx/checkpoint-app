@@ -1,8 +1,11 @@
 'use client'
-import Link from 'next/link'
+import { AdminHeader } from '@/components/admin/AdminHeader'
+import { useAuth } from '@/hooks/useAuth'
 import { useSync } from '@/hooks/useSync'
+import Link from 'next/link'
 
 export default function AdminPage() {
+  const { user } = useAuth()
   const { isOnline, isSyncing, lastSyncTime, syncError, manualSync } = useSync()
 
   const formatTime = (date: Date | null) => {
@@ -12,17 +15,7 @@ export default function AdminPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-200 px-6 py-4 shadow-sm">
-        <div className="flex items-center justify-between max-w-5xl mx-auto">
-          <div className="flex items-center gap-3">
-            <Link href="/" className="text-gray-400 hover:text-gray-600 text-sm">
-              ← КПП
-            </Link>
-            <span className="text-gray-300">|</span>
-            <h1 className="text-xl font-bold text-gray-800">⚙️ Адміністратор</h1>
-          </div>
-        </div>
-      </header>
+      <AdminHeader />
 
       <main className="max-w-5xl mx-auto px-6 py-8">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -96,6 +89,22 @@ export default function AdminPage() {
               Групування авто по проектах. Вмикати/вимикати, видаляти цілий проект.
             </p>
           </Link>
+
+          {/* Користувачі — тільки для адміна */}
+          {user?.role === 'ADMIN' && (
+            <Link
+              href="/admin/users"
+              className="bg-white rounded-xl border border-purple-200 p-6 hover:shadow-md transition-shadow group"
+            >
+              <div className="text-3xl mb-3">👥</div>
+              <h2 className="text-lg font-semibold text-gray-800 group-hover:text-purple-600 transition-colors">
+                Користувачі
+              </h2>
+              <p className="text-sm text-gray-500 mt-1">
+                Додавання операторів та адміністраторів. Зміна паролів та ролей.
+              </p>
+            </Link>
+          )}
 
         </div>
 
