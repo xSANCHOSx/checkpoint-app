@@ -1,5 +1,5 @@
-import { NextResponse, type NextRequest } from 'next/server'
 import { jwtVerify } from 'jose'
+import { NextResponse, type NextRequest } from 'next/server'
 
 const SECRET = new TextEncoder().encode(process.env.JWT_SECRET ?? '')
 const TOKEN_COOKIE = 'kpp_token'
@@ -13,6 +13,7 @@ const PROTECTED_API_PATHS = [
   '/api/projects',
   '/api/logs',
   '/api/auth/users',  // тільки для ADMIN
+  '/api/auth/me',     // потрібен токен щоб повернути поточного юзера
 ]
 
 // Публічні — без токену
@@ -117,5 +118,6 @@ export const config = {
     '/api/projects/:path*',
     '/api/logs/:path*',
     '/api/auth/users/:path*',
+    '/api/auth/me',
   ],
 }
