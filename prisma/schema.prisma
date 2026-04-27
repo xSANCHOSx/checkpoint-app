@@ -4,7 +4,18 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  
+}
+
+model User {
+  id           Int       @id @default(autoincrement())
+  username     String    @unique
+  passwordHash String
+  role         UserRole  @default(OPERATOR)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  lastLoginAt  DateTime?
+
+  @@index([username])
 }
 
 model Project {
@@ -14,9 +25,7 @@ model Project {
   note      String?
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
-
   vehicles  Vehicle[]
-
   @@index([active])
 }
 
@@ -36,9 +45,7 @@ model Vehicle {
   source       String     @default("manual")
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
-
-  logs AccessLog[]
-
+  logs         AccessLog[]
   @@index([digits])
   @@index([isExpired])
   @@index([accessType])
@@ -53,7 +60,6 @@ model EmergencyVehicle {
   addedBy   String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
   @@index([digits])
 }
 
@@ -67,10 +73,14 @@ model AccessLog {
   note       String?
   syncedAt   DateTime?
   timestamp  DateTime  @default(now())
-
   @@index([plate])
   @@index([timestamp])
   @@index([syncedAt])
+}
+
+enum UserRole {
+  ADMIN
+  OPERATOR
 }
 
 enum AccessType {
