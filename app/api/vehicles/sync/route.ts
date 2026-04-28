@@ -4,7 +4,6 @@ import { NextRequest, NextResponse } from 'next/server'
 const DEFAULT_LIMIT = 500
 const MAX_LIMIT = 1000
 
-// GET /api/vehicles/sync?since=2024-01-01T00:00:00Z&limit=500&offset=0
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl
   const since = searchParams.get('since')
@@ -40,11 +39,29 @@ export async function GET(request: NextRequest) {
       isExpired: true,
       note: true,
       updatedAt: true,
+      project: { select: { name: true, active: true } },
     },
     orderBy: { updatedAt: 'asc' },
     take: limit,
     skip: offset,
   })
 
-  return NextResponse.json(vehicles)
+  const result = vehicles.map(v => ({
+    id: v.id,
+    plate: v.plate,
+    digits: v.digits,
+    company: v.company,
+    projectId: v.projectId,
+    projectName: v.project?.name ?? null,
+    projectActive: v.project?.active ?? null,
+    contactName: v.contactName,
+    contactPhone: v.contactPhone,
+    accessType: v.accessType,
+    expiresAt: v.expiresAt?.toISOString() ?? null,
+    isExpired: v.isExpired,
+    note: v.note,
+    updatedAt: v.updatedAt.toISOString(),
+  }))
+
+  return NextResponse.json(result)
 }

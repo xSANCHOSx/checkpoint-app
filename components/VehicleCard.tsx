@@ -173,7 +173,7 @@ async function handleLog() {
       </div>
 
       {/* Проект — повна ширина внизу картки */}
-      <span>proect</span>
+
       {vehicle.projectName && (
         <div className={`mt-3 pt-3 border-t ${
           vehicle.projectActive === false ? 'border-gray-200' : 'border-indigo-100'

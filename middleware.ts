@@ -1,11 +1,10 @@
+import { jwtVerify } from 'jose'
 import { NextResponse, type NextRequest } from 'next/server'
-import { jwtVerify, SignJWT } from 'jose'
 
 const SECRET = new TextEncoder().encode(process.env.JWT_SECRET ?? '')
 const TOKEN_COOKIE = 'kpp_token'
 const CONFIG_COOKIE = 'kpp_config'
 
-// Маршрути що захищені JWT
 const PROTECTED_ADMIN_PATHS = ['/admin']
 const PROTECTED_API_PATHS = [
   '/api/vehicles',
@@ -50,33 +49,16 @@ function isAdminOnly(pathname: string): boolean {
   return ADMIN_ONLY_PATHS.some(p => pathname.startsWith(p))
 }
 
-/**
- * Перевіряє чи потрібна авторизація для сторінки оператора (/).
- *
- * Пріоритет:
- * 1. ENV змінна AUTH_OPERATOR_REQUIRED=true/false — найвищий пріоритет, вимагає рестарту
- * 2. Cookie kpp_config — встановлюється з адмін-панелі, без рестарту
- * 3. За замовчуванням: false (режим тестування)
- */
+// Тільки донгл (cookie kpp_config). ENV не використовується.
 async function isOperatorAuthRequired(req: NextRequest): Promise<boolean> {
-  // 1. ENV override
-  const envVal = process.env.AUTH_OPERATOR_REQUIRED
-  if (envVal === 'true') return true
-  if (envVal === 'false') return false
-
-  // 2. Config cookie (встановлюється адміном)
   const configCookie = req.cookies.get(CONFIG_COOKIE)?.value
-  if (configCookie) {
-    try {
-      const { payload } = await jwtVerify(configCookie, SECRET)
-      return payload.operatorAuthRequired === true
-    } catch {
-      // cookie недійсний — ігноруємо
-    }
+  if (!configCookie) return false
+  try {
+    const { payload } = await jwtVerify(configCookie, SECRET)
+    return payload.operatorAuthRequired === true
+  } catch {
+    return false
   }
-
-  // 3. Default: відкритий доступ (тестування)
-  return false
 }
 
 export async function middleware(req: NextRequest) {
@@ -84,7 +66,7 @@ export async function middleware(req: NextRequest) {
 
   if (isPublic(pathname)) return NextResponse.next()
 
-  // ── Сторінка оператора / ──────────────────────────────────────────
+  // ── Сторінка оператора / ─────────────────────────────────────────
   if (pathname === '/') {
     const authRequired = await isOperatorAuthRequired(req)
     if (!authRequired) return NextResponse.next()
@@ -112,7 +94,7 @@ export async function middleware(req: NextRequest) {
     }
   }
 
-  // ── Адмін-панель та API ───────────────────────────────────────────
+  // ── Адмін-панель та API ──────────────────────────────────────────
   const isAdminPage = isProtectedAdmin(pathname)
   const isApiRoute = isProtectedApi(pathname)
 

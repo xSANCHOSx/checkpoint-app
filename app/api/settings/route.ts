@@ -6,28 +6,16 @@ const CONFIG_COOKIE = 'kpp_config'
 
 export async function GET(req: NextRequest) {
   const configCookie = req.cookies.get(CONFIG_COOKIE)?.value
-  let cookieValue = false
+  let operatorAuthRequired = false
 
   if (configCookie) {
     try {
       const { payload } = await jwtVerify(configCookie, SECRET)
-      cookieValue = payload.operatorAuthRequired === true
+      operatorAuthRequired = payload.operatorAuthRequired === true
     } catch {}
   }
 
-  const envVal = process.env.AUTH_OPERATOR_REQUIRED
-  const envOverride = envVal === 'true' ? true : envVal === 'false' ? false : null
-
-  return NextResponse.json({
-    // Що реально діє
-    effective: envOverride !== null ? envOverride : cookieValue,
-    // Значення з cookie (адмінка)
-    cookieValue,
-    // ENV змінна — null якщо не задана
-    envOverride,
-    // Чи заблокований тоггл через ENV
-    lockedByEnv: envOverride !== null,
-  })
+  return NextResponse.json({ operatorAuthRequired })
 }
 
 export async function PATCH(req: NextRequest) {
@@ -44,7 +32,7 @@ export async function PATCH(req: NextRequest) {
     httpOnly: true,
     sameSite: 'lax',
     path: '/',
-    maxAge: 60 * 60 * 24 * 365, // 1 рік
+    maxAge: 60 * 60 * 24 * 365,
   })
   return res
 }
