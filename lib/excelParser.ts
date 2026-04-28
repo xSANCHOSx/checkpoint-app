@@ -1,5 +1,5 @@
 import * as XLSX from 'xlsx'
-import { normalizePlate, extractDigits } from './plateUtils'
+import { extractDigits, normalizePlate } from './plateUtils'
 
 export interface ExcelVehicleRow {
   plate: string
@@ -75,7 +75,7 @@ export function parseExcel(buffer: Buffer): {
     rows.push({
       plate,
       digits: extractDigits(plate),
-      company: getColumn(raw, COLUMN_MAP.company) || 'Невідома',
+      company: getColumn(raw, COLUMN_MAP.company) || '',
       contactName: getColumn(raw, COLUMN_MAP.contactName),
       contactPhone: getColumn(raw, COLUMN_MAP.contactPhone),
       accessType: expiresAt ? 'TEMPORARY' : 'PERMANENT',

@@ -1,7 +1,6 @@
 'use client'
 import { AdminHeader } from '@/components/admin/AdminHeader'
 import { BulkActionsModal } from '@/components/admin/BulkActionsModal'
-import { ExcelImport } from '@/components/admin/ExcelImport'
 import { VehicleForm } from '@/components/admin/VehicleForm'
 import { VehicleTable } from '@/components/admin/VehicleTable'
 import { useOnlineStatus } from '@/hooks/useOnlineStatus'
@@ -58,7 +57,6 @@ export default function VehiclesPage() {
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
-  const [showImport, setShowImport] = useState(false)
   const [editVehicle, setEditVehicle] = useState<Vehicle | null>(null)
   const [isLocal, setIsLocal] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
@@ -178,10 +176,6 @@ export default function VehiclesPage() {
                 📴 локальна база
               </span>
             )}
-            <button onClick={() => setShowImport(true)}
-              className="px-3 py-2 bg-green-50 text-green-700 border border-green-200 rounded-lg text-sm hover:bg-green-100">
-              📊 Імпорт Excel
-            </button>
             <button onClick={() => { setEditVehicle(null); setShowForm(true) }}
               disabled={isLocal}
               className="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 disabled:opacity-40">
@@ -343,12 +337,6 @@ export default function VehiclesPage() {
           vehicle={editVehicle}
           onClose={() => setShowForm(false)}
           onSaved={() => { setShowForm(false); fetchVehicles() }}
-        />
-      )}
-      {showImport && (
-        <ExcelImport
-          onClose={() => setShowImport(false)}
-          onImported={() => { setShowImport(false); fetchVehicles() }}
         />
       )}
       {showBulkModal && bulkAction && (
