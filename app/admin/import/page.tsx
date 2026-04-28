@@ -9,7 +9,7 @@ import {
   type ParsedVehicle,
   type TemplateConfig,
 } from '@/lib/excelParserCustom'
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 // ─── Типи ─────────────────────────────────────────────────────────────────────
 
@@ -18,7 +18,31 @@ type Source = 'gdrive'   | 'file'
 
 interface DuplicateEntry {
   plate:    string
-  include:  boolean  // true = оновити, false = пропустити
+  include:  boolean
+}
+
+interface RecentEntry {
+  label: string   // коротка назва для відображення
+  url:   string   // повне посилання
+  addedAt: number // timestamp
+}
+
+const RECENT_KEY    = 'import_recent_gdrive'
+const RECENT_LIMIT  = 5
+
+function loadRecent(): RecentEntry[] {
+  try {
+    return JSON.parse(localStorage.getItem(RECENT_KEY) ?? '[]')
+  } catch {
+    return []
+  }
+}
+
+function saveRecent(url: string) {
+  const label = url.replace(/^https?:\/\/(docs\.google\.com|drive\.google\.com)\//, '').slice(0, 60)
+  const prev  = loadRecent().filter(r => r.url !== url)
+  const next: RecentEntry[] = [{ label, url, addedAt: Date.now() }, ...prev].slice(0, RECENT_LIMIT)
+  localStorage.setItem(RECENT_KEY, JSON.stringify(next))
 }
 
 // ─── Дефолти ──────────────────────────────────────────────────────────────────
@@ -57,6 +81,8 @@ export default function ImportPage() {
   const [source, setSource] = useState<Source>('gdrive')
 
   const [gdriveUrl, setGdriveUrl] = useState('')
+  const [recentFiles, setRecentFiles] = useState<RecentEntry[]>([])
+  const [showRecent, setShowRecent]   = useState(false)
   const [tmpl, setTmpl]           = useState(DEFAULT_TEMPLATE)
   const [custom, setCustom]       = useState(DEFAULT_CUSTOM)
 
@@ -75,6 +101,11 @@ export default function ImportPage() {
 
   const fileRef = useRef<HTMLInputElement>(null)
 
+  // Завантажуємо недавні файли при монтуванні
+  useEffect(() => {
+    setRecentFiles(loadRecent())
+  }, [])
+
   // ─── Завантаження файлу ───────────────────────────────────────────────────
 
   const loadBuffer = useCallback(async (): Promise<Buffer | null> => {
@@ -90,7 +121,11 @@ export default function ImportPage() {
         setError(j.error ?? 'Помилка завантаження файлу')
         return null
       }
-      return Buffer.from(await res.arrayBuffer())
+      const buf = Buffer.from(await res.arrayBuffer())
+      // Зберігаємо в недавні після успішного завантаження
+      saveRecent(gdriveUrl.trim())
+      setRecentFiles(loadRecent())
+      return buf
     } else {
       const file = fileRef.current?.files?.[0]
       if (!file) { setError('Виберіть файл'); return null }
@@ -300,13 +335,59 @@ export default function ImportPage() {
           {source === 'gdrive' ? (
             <div>
               <label className="label">Посилання на файл</label>
-              <input
-                type="url"
-                value={gdriveUrl}
-                onChange={e => setGdriveUrl(e.target.value)}
-                placeholder="https://docs.google.com/spreadsheets/d/... або https://drive.google.com/file/d/..."
-                className="input w-full"
-              />
+              <div className="relative">
+                <input
+                  type="url"
+                  value={gdriveUrl}
+                  onChange={e => { setGdriveUrl(e.target.value); setShowRecent(false) }}
+                  onFocus={() => recentFiles.length > 0 && setShowRecent(true)}
+                  placeholder="https://docs.google.com/spreadsheets/d/..."
+                  className="input w-full pr-24"
+                />
+                {recentFiles.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setShowRecent(v => !v)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-md whitespace-nowrap"
+                  >
+                    🕐 Недавні ({recentFiles.length})
+                  </button>
+                )}
+              </div>
+
+              {/* Список недавніх */}
+              {showRecent && recentFiles.length > 0 && (
+                <div className="mt-1 border border-gray-200 rounded-xl shadow-sm bg-white overflow-hidden">
+                  <div className="flex items-center justify-between px-3 py-2 bg-gray-50 border-b border-gray-100">
+                    <span className="text-xs font-semibold text-gray-500">Останні файли</span>
+                    <button
+                      onClick={() => {
+                        localStorage.removeItem(RECENT_KEY)
+                        setRecentFiles([])
+                        setShowRecent(false)
+                      }}
+                      className="text-xs text-red-400 hover:text-red-600"
+                    >
+                      Очистити
+                    </button>
+                  </div>
+                  {recentFiles.map((r, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => { setGdriveUrl(r.url); setShowRecent(false) }}
+                      className="w-full text-left px-3 py-2.5 hover:bg-blue-50 border-b border-gray-50 last:border-0 transition-colors"
+                    >
+                      <div className="text-sm text-blue-700 font-medium truncate">{r.label}</div>
+                      <div className="text-xs text-gray-400 mt-0.5 truncate">{r.url}</div>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              <p className="text-xs text-gray-400 mt-1">
+                Файл повинен бути відкритий для перегляду. Підтримуються Google Sheets та .xlsx на Drive.
+              </p>
             </div>
           ) : (
             <div>
