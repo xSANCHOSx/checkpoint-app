@@ -181,12 +181,7 @@ export default function AdminPage() {
             >
               🔄 Запустити cron вручну
             </a>
-            <a
-              href="/admin/vehicles?import=1"
-              className="px-4 py-2 bg-green-50 text-green-700 border border-green-200 rounded-lg text-sm hover:bg-green-100 transition-colors"
-            >
-              📊 Імпортувати Excel
-            </a>
+            
           </div>
         </div>
       </main>
