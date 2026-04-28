@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma'
-import { NextRequest, NextResponse } from 'next/server'
 import { batchLogsSchema, formatZodError, type LogEntry } from '@/lib/zodSchemas'
+import { NextRequest, NextResponse } from 'next/server'
 
 const MAX_BODY_BYTES = 1 * 1024 * 1024 // 1 MB
 
@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Перевірка: якщо vehicleId вже isExpired у БД до батчу — відхиляємо ALLOWED
-  const vehicleIdsToCheck = [...allowedByVehicle.keys()]
+  const vehicleIdsToCheck = Array.from(allowedByVehicle.keys())
   const alreadyExpired = vehicleIdsToCheck.length > 0
     ? await prisma.vehicle.findMany({
         where: { id: { in: vehicleIdsToCheck }, isExpired: true },
@@ -101,7 +101,7 @@ export async function POST(request: NextRequest) {
   })
 
   // SINGLE_USE: expire тільки переможців, яких не було заблоковано заздалегідь
-  const allowedIdsToExpire = [...allowedByVehicle.keys()].filter(id => !expiredSet.has(id))
+  const allowedIdsToExpire = Array.from(allowedByVehicle.keys()).filter(id => !expiredSet.has(id))
 
   if (allowedIdsToExpire.length > 0) {
     await prisma.vehicle.updateMany({
