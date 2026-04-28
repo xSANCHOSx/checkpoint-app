@@ -1,25 +1,10 @@
-// In-memory rate limiter
-// Vercel: per-instance protection (serverless = multiple instances → partial protection)
-// Docker: single instance → full protection
-// For production-grade rate limiting on Vercel → використовуйте Upstash Redis
-
-interface RateLimitEntry {
-  count: number
-  resetAt: number
-}
-
-const store = new Map<string, RateLimitEntry>()
-
-// Cleanup old entries every 5 minutes
-let lastCleanup = Date.now()
-function cleanup() {
-  const now = Date.now()
-  if (now - lastCleanup < 5 * 60 * 1000) return
-  lastCleanup = now
-  store.forEach((entry, key) => {
-  if (entry.resetAt < now) store.delete(key)
-})
-}
+/**
+ * DB-based rate limiter (PostgreSQL via Prisma).
+ * Працює коректно у serverless (Vercel) та Docker — спільний стан у БД.
+ * Замінює попередню in-memory реалізацію (Map), яка не працювала між
+ * ізольованими serverless-інстанціями.
+ */
+import { prisma } from './prisma'
 
 export interface RateLimitResult {
   allowed: boolean
@@ -28,27 +13,57 @@ export interface RateLimitResult {
 }
 
 /**
- * @param key      Unique identifier (IP + route)
- * @param limit    Max requests per window
- * @param windowMs Window in milliseconds
+ * @param key      Унікальний ідентифікатор (IP + маршрут)
+ * @param limit    Максимум запитів у вікні
+ * @param windowMs Тривалість вікна в мілісекундах
  */
-export function rateLimit(key: string, limit: number, windowMs: number): RateLimitResult {
-  cleanup()
-  const now = Date.now()
-  const entry = store.get(key)
+export async function rateLimit(
+  key: string,
+  limit: number,
+  windowMs: number
+): Promise<RateLimitResult> {
+  const now = new Date()
 
-  if (!entry || entry.resetAt < now) {
-    const newEntry: RateLimitEntry = { count: 1, resetAt: now + windowMs }
-    store.set(key, newEntry)
-    return { allowed: true, remaining: limit - 1, resetAt: newEntry.resetAt }
+  const result = await prisma.$transaction(async (tx) => {
+    const existing = await tx.rateLimit.findUnique({ where: { key } })
+
+    // Вікно не існує або вже скинулось → починаємо нове
+    if (!existing || existing.resetAt < now) {
+      const resetAt = new Date(now.getTime() + windowMs)
+      await tx.rateLimit.upsert({
+        where: { key },
+        create: { key, count: 1, resetAt },
+        update: { count: 1, resetAt },
+      })
+      return { count: 1, resetAt }
+    }
+
+    // Інкремент у поточному вікні
+    const updated = await tx.rateLimit.update({
+      where: { key },
+      data: { count: { increment: 1 } },
+      select: { count: true },
+    })
+
+    return { count: updated.count, resetAt: existing.resetAt }
+  })
+
+  const allowed = result.count <= limit
+  return {
+    allowed,
+    remaining: Math.max(0, limit - result.count),
+    resetAt: result.resetAt.getTime(),
   }
-
-  entry.count++
-  const allowed = entry.count <= limit
-  return { allowed, remaining: Math.max(0, limit - entry.count), resetAt: entry.resetAt }
 }
 
-/** Extract real IP from Next.js request headers */
+/** Очищення застарілих записів — викликати з cron або /api/cron */
+export async function cleanupRateLimits(): Promise<void> {
+  await prisma.rateLimit.deleteMany({
+    where: { resetAt: { lt: new Date() } },
+  })
+}
+
+/** Витягти реальний IP з Next.js request headers */
 export function getClientIp(request: Request): string {
   return (
     request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||

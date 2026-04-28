@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { cleanupRateLimits } from '@/lib/rateLimit'
 
 export async function GET(request: NextRequest) {
   // Vercel Cron автоматично додає Authorization: Bearer <CRON_SECRET>
@@ -36,9 +37,13 @@ export async function GET(request: NextRequest) {
     },
   })
 
+  // 3. Очистити застарілі записи rate limiter у БД
+  await cleanupRateLimits()
+
   return NextResponse.json({
     markedExpired: marked.count,
     deleted: deleted.count,
+    rateLimitsCleaned: true,
     timestamp: now.toISOString(),
   })
 }

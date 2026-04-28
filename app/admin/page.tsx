@@ -1,6 +1,5 @@
 'use client'
 import { AdminHeader } from '@/components/admin/AdminHeader'
-import { AuthStatusBanner } from '@/components/admin/AuthStatusBanner'
 import { useAuth } from '@/hooks/useAuth'
 import { useSync } from '@/hooks/useSync'
 import Link from 'next/link'
@@ -19,9 +18,6 @@ export default function AdminPage() {
       <AdminHeader />
 
       <main className="max-w-5xl mx-auto px-6 py-8">
-
-        {/* Статус авторизації оператора */}
-        <AuthStatusBanner />
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
@@ -122,7 +118,7 @@ export default function AdminPage() {
                 Налаштування
               </h2>
               <p className="text-sm text-gray-500 mt-1">
-                Увімкнення авторизації для операторів. Режим тестування.
+                Авторизація операторів та параметри системи.
               </p>
             </Link>
           )}

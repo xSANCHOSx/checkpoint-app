@@ -3,6 +3,7 @@ import { useOnlineStatus } from '@/hooks/useOnlineStatus'
 import type { SearchResult } from '@/hooks/useSearch'
 import { savePendingLog } from '@/lib/localDb'
 import { useState } from 'react'
+import toast from 'react-hot-toast'
 
 interface Props {
   vehicle: SearchResult
@@ -83,21 +84,28 @@ async function handleLog() {
 
   try {
     if (isOnline) {
-      await fetch('/api/checkpoint', {
+      const res = await fetch('/api/checkpoint', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(logData),
       })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      toast.success(`✅ Записано: ${vehicle.plate}`)
     } else {
       await savePendingLog(logData)
+      toast.success(`💾 Збережено офлайн: ${vehicle.plate}`)
     }
     setLogged(true)
     onLogged?.()
-    // Без setTimeout — кнопка залишається "✓ Записано" до нового пошуку
   } catch {
-    await savePendingLog(logData)
-    setLogged(true)
-    onLogged?.()
+    try {
+      await savePendingLog(logData)
+      toast.success(`💾 Збережено офлайн: ${vehicle.plate}`)
+      setLogged(true)
+      onLogged?.()
+    } catch {
+      toast.error(`❌ Помилка запису: ${vehicle.plate}`)
+    }
   } finally {
     setLogging(false)
   }

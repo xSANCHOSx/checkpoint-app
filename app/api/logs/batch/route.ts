@@ -1,35 +1,8 @@
 import { prisma } from '@/lib/prisma'
 import { NextRequest, NextResponse } from 'next/server'
+import { batchLogsSchema, formatZodError, type LogEntry } from '@/lib/zodSchemas'
 
-const MAX_LOGS_PER_REQUEST = 500
 const MAX_BODY_BYTES = 1 * 1024 * 1024 // 1 MB
-
-const VALID_RESULTS = new Set(['ALLOWED', 'DENIED', 'UNKNOWN'])
-
-interface LogEntry {
-  plate: string
-  vehicleId?: number | null
-  result?: string
-  operatorId?: string | null
-  note?: string | null
-  timestamp?: string
-}
-
-function validateLog(log: unknown): log is LogEntry {
-  if (!log || typeof log !== 'object') return false
-  const l = log as Record<string, unknown>
-
-  if (typeof l.plate !== 'string' || l.plate.trim().length === 0) return false
-  if (l.plate.length > 20) return false
-
-  if (l.result !== undefined && !VALID_RESULTS.has(l.result as string)) return false
-  if (l.vehicleId !== undefined && l.vehicleId !== null && typeof l.vehicleId !== 'number') return false
-  if (l.operatorId !== undefined && l.operatorId !== null && typeof l.operatorId !== 'string') return false
-  if (l.note !== undefined && l.note !== null && typeof l.note !== 'string') return false
-  if (l.timestamp !== undefined && isNaN(Date.parse(l.timestamp as string))) return false
-
-  return true
-}
 
 export async function POST(request: NextRequest) {
   // Перевірка розміру запиту
@@ -38,35 +11,87 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Payload too large' }, { status: 413 })
   }
 
-  let body: unknown
+  let rawBody: unknown
   try {
-    body = await request.json()
+    rawBody = await request.json()
   } catch {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
   }
 
-  if (!Array.isArray(body) || body.length === 0) {
+  if (!Array.isArray(rawBody) || rawBody.length === 0) {
     return NextResponse.json({ saved: 0 })
   }
 
-  if (body.length > MAX_LOGS_PER_REQUEST) {
+  // Zod-валідація масиву логів
+  const parsed = batchLogsSchema.safeParse(rawBody)
+  if (!parsed.success) {
     return NextResponse.json(
-      { error: `Too many logs. Max ${MAX_LOGS_PER_REQUEST} per request.` },
+      { error: formatZodError(parsed.error) },
       { status: 400 }
     )
   }
 
-  // Валідація кожного запису
-  const validLogs = body.filter(validateLog)
+  const validLogs = parsed.data
   if (validLogs.length === 0) {
     return NextResponse.json({ saved: 0 })
   }
 
+  // ─── Вирішення конфліктів SINGLE_USE ──────────────────────────────────────
+  // Якщо кілька операторів офлайн пропустили одне авто SINGLE_USE,
+  // при синхронізації прийде кілька ALLOWED-логів для одного vehicleId.
+  // Залишаємо лише перший за timestamp (найраніший), решту змінюємо на DENIED.
+  const allowedByVehicle = new Map<number, LogEntry>()
+  const resolvedLogs: LogEntry[] = []
+
+  for (const log of validLogs) {
+    if (log.result === 'ALLOWED' && typeof log.vehicleId === 'number') {
+      const existing = allowedByVehicle.get(log.vehicleId)
+      if (!existing) {
+        allowedByVehicle.set(log.vehicleId, log)
+        resolvedLogs.push(log)
+      } else {
+        // Пізніший дубль — визначаємо переможця за timestamp
+        const existingTs = existing.timestamp ? new Date(existing.timestamp).getTime() : 0
+        const currentTs = log.timestamp ? new Date(log.timestamp).getTime() : 0
+        if (currentTs < existingTs) {
+          // Поточний раніший → він переможець, попередній стає DENIED
+          allowedByVehicle.set(log.vehicleId, log)
+          const prevIdx = resolvedLogs.findIndex(l => l === existing)
+          if (prevIdx !== -1) resolvedLogs[prevIdx] = { ...existing, result: 'DENIED', note: (existing.note ?? '') + ' [конфлікт: дубль SINGLE_USE]' }
+          resolvedLogs.push(log)
+        } else {
+          // Поточний пізніший → він стає DENIED
+          resolvedLogs.push({ ...log, result: 'DENIED', note: (log.note ?? '') + ' [конфлікт: дубль SINGLE_USE]' })
+        }
+      }
+    } else {
+      resolvedLogs.push(log)
+    }
+  }
+
+  // Перевірка: якщо vehicleId вже isExpired у БД до батчу — відхиляємо ALLOWED
+  const vehicleIdsToCheck = [...allowedByVehicle.keys()]
+  const alreadyExpired = vehicleIdsToCheck.length > 0
+    ? await prisma.vehicle.findMany({
+        where: { id: { in: vehicleIdsToCheck }, isExpired: true },
+        select: { id: true },
+      })
+    : []
+  const expiredSet = new Set(alreadyExpired.map(v => v.id))
+
+  const finalLogs = resolvedLogs.map(log => {
+    if (log.result === 'ALLOWED' && typeof log.vehicleId === 'number' && expiredSet.has(log.vehicleId)) {
+      return { ...log, result: 'DENIED' as const, note: (log.note ?? '') + ' [вже заблоковано]' }
+    }
+    return log
+  })
+
+  // ─── Запис у БД ────────────────────────────────────────────────────────────
   const saved = await prisma.accessLog.createMany({
-    data: validLogs.map(log => ({
+    data: finalLogs.map(log => ({
       plate: log.plate.trim(),
       vehicleId: typeof log.vehicleId === 'number' ? log.vehicleId : null,
-      result: (VALID_RESULTS.has(log.result ?? '') ? log.result : 'UNKNOWN') as 'ALLOWED' | 'DENIED' | 'UNKNOWN',
+      result: log.result as 'ALLOWED' | 'DENIED' | 'UNKNOWN',
       operatorId: log.operatorId || null,
       note: log.note || null,
       syncedAt: new Date(),
@@ -75,14 +100,12 @@ export async function POST(request: NextRequest) {
     skipDuplicates: true,
   })
 
-  // SINGLE_USE: expire vehicles that were ALLOWED offline
-  const allowedIds = validLogs
-    .filter(l => l.result === 'ALLOWED' && typeof l.vehicleId === 'number')
-    .map(l => l.vehicleId as number)
+  // SINGLE_USE: expire тільки переможців, яких не було заблоковано заздалегідь
+  const allowedIdsToExpire = [...allowedByVehicle.keys()].filter(id => !expiredSet.has(id))
 
-  if (allowedIds.length > 0) {
+  if (allowedIdsToExpire.length > 0) {
     await prisma.vehicle.updateMany({
-      where: { id: { in: allowedIds }, accessType: 'SINGLE_USE' },
+      where: { id: { in: allowedIdsToExpire }, accessType: 'SINGLE_USE' },
       data: { isExpired: true },
     })
   }

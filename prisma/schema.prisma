@@ -94,3 +94,13 @@ enum Result {
   DENIED
   UNKNOWN
 }
+
+// DB-based rate limiter (works in serverless / multi-instance environments)
+model RateLimit {
+  key       String   @id
+  count     Int      @default(0)
+  resetAt   DateTime
+  updatedAt DateTime @updatedAt
+
+  @@index([resetAt])
+}

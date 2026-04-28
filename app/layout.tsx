@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from 'next'
+import { Toaster } from 'react-hot-toast'
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -31,7 +32,18 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <link rel="apple-touch-icon" href="/icons/icon-192.png" />
       </head>
-      <body>{children}</body>
+      <body>
+        {children}
+        <Toaster
+          position="bottom-center"
+          toastOptions={{
+            duration: 3000,
+            style: { fontSize: '14px', maxWidth: '320px' },
+            success: { style: { background: '#f0fdf4', border: '1px solid #86efac', color: '#166534' } },
+            error: { style: { background: '#fef2f2', border: '1px solid #fca5a5', color: '#991b1b' } },
+          }}
+        />
+      </body>
     </html>
   )
 }

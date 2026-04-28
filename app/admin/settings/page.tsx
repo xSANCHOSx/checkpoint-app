@@ -51,7 +51,7 @@ export default function SettingsPage() {
                 <div className="text-sm text-gray-500 mt-0.5">
                   Стан:{' '}
                   <span className={`font-semibold ${authRequired ? 'text-green-600' : 'text-orange-500'}`}>
-                    {authRequired ? '✅ Увімкнена' : '🔓 Вимкнена (тестовий режим)'}
+                    {authRequired ? '✅ Увімкнена' : '🔓 Вимкнена'}
                   </span>
                 </div>
               </div>

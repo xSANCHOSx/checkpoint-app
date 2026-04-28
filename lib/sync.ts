@@ -38,28 +38,39 @@ export async function syncAll(): Promise<{ pulled: number; pushed: number }> {
   return { pulled, pushed }
 }
 
-// Відправляємо офлайн-логи на сервер (з retry)
+// Відправляємо офлайн-логи на сервер (з retry + пагінацією по 100 записів)
 async function pushPendingLogs(): Promise<number> {
   const pending = await getPendingLogs()
   if (pending.length === 0) return 0
 
-  try {
-    await withRetry(async () => {
-      const res = await fetch('/api/logs/batch', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(pending),
+  const BATCH_SIZE = 100
+  let totalPushed = 0
+
+  // Відправляємо порціями по 100, щоб не перевантажувати мережу одним великим запитом
+  for (let i = 0; i < pending.length; i += BATCH_SIZE) {
+    const batch = pending.slice(i, i + BATCH_SIZE)
+
+    try {
+      await withRetry(async () => {
+        const res = await fetch('/api/logs/batch', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(batch),
+        })
+        if (!res.ok) throw new Error(`Push failed: ${res.status}`)
+
+        const ids = batch.map(l => l.id!).filter(Boolean)
+        await markLogsSynced(ids)
       })
-      if (!res.ok) throw new Error(`Push failed: ${res.status}`)
 
-      const ids = pending.map(l => l.id!).filter(Boolean)
-      await markLogsSynced(ids)
-    })
-
-    return pending.length
-  } catch {
-    return 0
+      totalPushed += batch.length
+    } catch {
+      // Якщо батч не пройшов — зупиняємось (наступна синхронізація повторить)
+      break
+    }
   }
+
+  return totalPushed
 }
 
 // Завантажуємо оновлені авто з сервера (з retry та пагінацією)

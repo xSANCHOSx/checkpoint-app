@@ -1,38 +1,42 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { normalizePlate } from '@/lib/plateUtils'
-
-const VALID_RESULTS = new Set(['ALLOWED', 'DENIED', 'UNKNOWN'])
+import { checkpointSchema, formatZodError } from '@/lib/zodSchemas'
 
 export async function POST(request: NextRequest) {
-  let body: Record<string, unknown>
+  let rawBody: unknown
   try {
-    body = await request.json()
+    rawBody = await request.json()
   } catch {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
   }
 
-  const plate = typeof body.plate === 'string' ? normalizePlate(body.plate) : ''
+  // Zod-валідація
+  const parsed = checkpointSchema.safeParse(rawBody)
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: formatZodError(parsed.error) },
+      { status: 400 }
+    )
+  }
+
+  const { result, vehicleId, operatorId, note, timestamp } = parsed.data
+  const plate = normalizePlate(parsed.data.plate)
+
   if (!plate || plate.length < 4) {
     return NextResponse.json({ error: 'Некоректний номер авто' }, { status: 400 })
   }
-
-  const result = VALID_RESULTS.has(body.result as string)
-    ? (body.result as 'ALLOWED' | 'DENIED' | 'UNKNOWN')
-    : 'UNKNOWN'
-
-  const vehicleId = typeof body.vehicleId === 'number' ? body.vehicleId : null
 
   // Запис логу
   const log = await prisma.accessLog.create({
     data: {
       plate,
-      vehicleId,
+      vehicleId: vehicleId ?? null,
       result,
-      operatorId: typeof body.operatorId === 'string' ? body.operatorId : null,
-      note: typeof body.note === 'string' ? body.note : null,
+      operatorId: operatorId ?? null,
+      note: note ?? null,
       syncedAt: new Date(),
-      timestamp: typeof body.timestamp === 'string' ? new Date(body.timestamp) : new Date(),
+      timestamp: timestamp ? new Date(timestamp) : new Date(),
     },
   })
 

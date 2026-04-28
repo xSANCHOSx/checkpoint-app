@@ -3,11 +3,18 @@ import bcrypt from 'bcryptjs'
 import { prisma } from '@/lib/prisma'
 import { signToken, tokenCookieOptions } from '@/lib/jwt'
 import { rateLimit, getClientIp } from '@/lib/rateLimit'
+import { loginSchema, formatZodError } from '@/lib/zodSchemas'
+
+// Хеш для порівняння коли користувач не знайдений (захист від timing attack).
+// Можна змінити через env DUMMY_HASH (заздалегідь згенерований bcrypt-хеш).
+const DUMMY_HASH =
+  process.env.DUMMY_HASH ??
+  '$2b$12$dummyhashforcomparisonpurposesonly123456789012345678'
 
 export async function POST(request: NextRequest) {
-  // Rate limit: 10 спроб за 15 хвилин з одного IP
+  // Rate limit: 10 спроб за 15 хвилин з одного IP (DB-based → працює у serverless)
   const ip = getClientIp(request)
-  const rl = rateLimit(`login:${ip}`, 10, 15 * 60_000)
+  const rl = await rateLimit(`login:${ip}`, 10, 15 * 60_000)
   if (!rl.allowed) {
     return NextResponse.json(
       { error: 'Забагато спроб. Спробуйте через 15 хвилин.' },
@@ -18,20 +25,25 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  let body: { username?: string; password?: string }
+  let rawBody: unknown
   try {
-    body = await request.json()
+    rawBody = await request.json()
   } catch {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
   }
 
-  const { username, password } = body
-  if (!username || !password) {
-    return NextResponse.json({ error: 'Логін та пароль обов\'язкові' }, { status: 400 })
+  // Zod-валідація вхідних даних
+  const parsed = loginSchema.safeParse(rawBody)
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: formatZodError(parsed.error) },
+      { status: 400 }
+    )
   }
 
+  const { username, password } = parsed.data
+
   // Завжди виконуємо порівняння хешу (захист від timing attack via user enumeration)
-  const DUMMY_HASH = '$2b$12$dummyhashforcomparisonpurposesonly123456789012345678'
   const user = await prisma.user.findUnique({ where: { username } })
   const hashToCompare = user?.passwordHash ?? DUMMY_HASH
 
