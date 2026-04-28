@@ -1,7 +1,7 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
-import { searchLocal, searchEmergency } from '@/lib/localDb'
-import { getVehicleStatus, getDaysLeft, getDaysOverdue } from '@/lib/plateUtils'
+import { searchEmergency, searchLocal } from '@/lib/localDb'
+import { getDaysLeft, getDaysOverdue, getVehicleStatus } from '@/lib/plateUtils'
+import { useCallback, useEffect, useState } from 'react'
 
 export interface SearchResult {
   id: number
@@ -18,7 +18,7 @@ export interface SearchResult {
   note: string | null
   isEmergency?: boolean
   projectName?: string | null
-  projectActive?: boolean
+  projectActive?: boolean | null
 }
 
 export function useSearch() {
