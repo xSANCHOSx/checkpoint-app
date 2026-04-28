@@ -6,30 +6,48 @@ import {
   parseTemplateMode,
   type CustomConfig,
   type ParsedSheet,
+  type ParsedVehicle,
   type TemplateConfig,
 } from '@/lib/excelParserCustom'
 import { useCallback, useRef, useState } from 'react'
 
 // ─── Типи ─────────────────────────────────────────────────────────────────────
 
-type Mode = 'template' | 'custom'
-type Source = 'gdrive' | 'file'
+type Mode   = 'template' | 'custom'
+type Source = 'gdrive'   | 'file'
 
-// ─── Стан форми ───────────────────────────────────────────────────────────────
+interface DuplicateEntry {
+  plate:    string
+  include:  boolean  // true = оновити, false = пропустити
+}
+
+// ─── Дефолти ──────────────────────────────────────────────────────────────────
 
 const DEFAULT_TEMPLATE: Omit<TemplateConfig, 'mode'> = {
-  projectCell: 'B2',
-  dateCell:    'D3',
-  vehicleCol:  'A',
-  startRow:    5,
+  projectCell:       'B2',
+  dateCell:          'D3',
+  vehicleCol:        'A',
+  startRow:          2,
+  companyCol:        'B',
+  projectColPerRow:  'C',
+  accessTypeCol:     'D',
+  expiresAtColPerRow:'E',
+  contactNameCol:    '',
+  contactPhoneCol:   '',
+  noteCol:           '',
 }
 
 const DEFAULT_CUSTOM: Omit<CustomConfig, 'mode'> = {
-  plateCol:     'A',
-  projectCol:   '',
-  projectFixed: '',
-  dateToCol:    '',
-  dataStartRow: 2,
+  plateCol:       'A',
+  companyCol:     'B',
+  projectCol:     'C',
+  accessTypeCol:  'D',
+  dateToCol:      'E',
+  contactNameCol: '',
+  contactPhoneCol:'',
+  noteCol:        '',
+  projectFixed:   '',
+  dataStartRow:   2,
 }
 
 // ─── Головний компонент ────────────────────────────────────────────────────────
@@ -42,9 +60,14 @@ export default function ImportPage() {
   const [tmpl, setTmpl]           = useState(DEFAULT_TEMPLATE)
   const [custom, setCustom]       = useState(DEFAULT_CUSTOM)
 
-  const [sheets, setSheets]               = useState<ParsedSheet[]>([])
-  const [sheetList, setSheetList]         = useState<string[]>([])    // для template — список листів
-  const [selectedSheets, setSelectedSheets] = useState<Set<string>>(new Set())
+  const [sheets, setSheets]                   = useState<ParsedSheet[]>([])
+  const [sheetList, setSheetList]             = useState<string[]>([])
+  const [selectedSheets, setSelectedSheets]   = useState<Set<string>>(new Set())
+
+  // Дублікати
+  const [duplicates, setDuplicates]           = useState<DuplicateEntry[]>([])
+  const [showDuplicates, setShowDuplicates]   = useState(false)
+  const [checkingDups, setCheckingDups]       = useState(false)
 
   const [status, setStatus]   = useState<'idle' | 'loading' | 'parsed' | 'saving' | 'done'>('idle')
   const [error, setError]     = useState<string | null>(null)
@@ -80,6 +103,8 @@ export default function ImportPage() {
   const handleParse = async () => {
     setError(null)
     setSheets([])
+    setDuplicates([])
+    setShowDuplicates(false)
     setSaveResult(null)
     setStatus('loading')
 
@@ -88,18 +113,45 @@ export default function ImportPage() {
       if (!buf) { setStatus('idle'); return }
 
       if (mode === 'template') {
-        // Спочатку отримати список листів для вибору
         const names = getSheetNames(buf)
         setSheetList(names)
         setSelectedSheets(new Set(names))
 
-        const config: TemplateConfig = { mode: 'template', ...tmpl }
+        const optionalStr = (v: string) => v.trim() || undefined
+        const config: TemplateConfig = {
+          mode: 'template',
+          projectCell:        tmpl.projectCell,
+          dateCell:           tmpl.dateCell,
+          vehicleCol:         tmpl.vehicleCol,
+          startRow:           tmpl.startRow,
+          companyCol:         optionalStr(tmpl.companyCol ?? ''),
+          projectColPerRow:   optionalStr(tmpl.projectColPerRow ?? ''),
+          accessTypeCol:      optionalStr(tmpl.accessTypeCol ?? ''),
+          expiresAtColPerRow: optionalStr(tmpl.expiresAtColPerRow ?? ''),
+          contactNameCol:     optionalStr(tmpl.contactNameCol ?? ''),
+          contactPhoneCol:    optionalStr(tmpl.contactPhoneCol ?? ''),
+          noteCol:            optionalStr(tmpl.noteCol ?? ''),
+        }
         const parsed = parseTemplateMode(buf, config)
         setSheets(parsed)
       } else {
-        const config: CustomConfig = { mode: 'custom', ...custom }
+        const optionalStr = (v: string | undefined) => v?.trim() || undefined
+        const config: CustomConfig = {
+          mode: 'custom',
+          plateCol:       custom.plateCol,
+          companyCol:     optionalStr(custom.companyCol),
+          projectCol:     optionalStr(custom.projectCol),
+          accessTypeCol:  optionalStr(custom.accessTypeCol),
+          dateToCol:      optionalStr(custom.dateToCol),
+          contactNameCol: optionalStr(custom.contactNameCol),
+          contactPhoneCol:optionalStr(custom.contactPhoneCol),
+          noteCol:        optionalStr(custom.noteCol),
+          projectFixed:   custom.projectFixed || undefined,
+          dataStartRow:   custom.dataStartRow,
+        }
         const parsed = parseCustomMode(buf, config)
         setSheets(parsed)
+        setSelectedSheets(new Set(parsed.map(s => s.sheetName)))
       }
 
       setStatus('parsed')
@@ -109,22 +161,61 @@ export default function ImportPage() {
     }
   }
 
-  // ─── Тоггл вибору аркуша ──────────────────────────────────────────────────
+  // ─── Перевірка дублікатів ─────────────────────────────────────────────────
 
-  const toggleSheet = (name: string) => {
-    setSelectedSheets(prev => {
-      const next = new Set(prev)
-      next.has(name) ? next.delete(name) : next.add(name)
-      return next
-    })
+  const handleCheckDuplicates = async () => {
+    const allPlates = sheets
+      .filter(s => selectedSheets.has(s.sheetName))
+      .flatMap(s => s.vehicles.map(v => v.plate))
+
+    if (allPlates.length === 0) { setError('Немає авто для перевірки'); return }
+
+    setCheckingDups(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/import/check', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plates: allPlates }),
+      })
+      const j = await res.json()
+      const existing: string[] = j.existing ?? []
+
+      if (existing.length === 0) {
+        // Немає дублікатів — одразу зберігаємо
+        setDuplicates([])
+        setShowDuplicates(false)
+        await doSave([])
+      } else {
+        setDuplicates(existing.map(plate => ({ plate, include: true })))
+        setShowDuplicates(true)
+      }
+    } catch {
+      setError('Помилка перевірки дублікатів')
+    } finally {
+      setCheckingDups(false)
+    }
+  }
+
+  // ─── Перемикач дублікату ──────────────────────────────────────────────────
+
+  const toggleDuplicate = (plate: string) => {
+    setDuplicates(prev => prev.map(d => d.plate === plate ? { ...d, include: !d.include } : d))
+  }
+
+  const toggleAllDuplicates = (include: boolean) => {
+    setDuplicates(prev => prev.map(d => ({ ...d, include })))
   }
 
   // ─── Збереження ───────────────────────────────────────────────────────────
 
-  const handleSave = async () => {
+  const doSave = async (dups: DuplicateEntry[]) => {
+    const skipSet = new Set(dups.filter(d => !d.include).map(d => d.plate))
+
     const vehicles = sheets
       .filter(s => selectedSheets.has(s.sheetName))
       .flatMap(s => s.vehicles)
+      .filter(v => !skipSet.has(v.plate))
 
     if (vehicles.length === 0) { setError('Немає авто для збереження'); return }
 
@@ -140,23 +231,41 @@ export default function ImportPage() {
       if (!res.ok) { setError(j.error ?? 'Помилка збереження'); setStatus('parsed'); return }
       setSaveResult({ imported: j.imported, updated: j.updated })
       setStatus('done')
+      setShowDuplicates(false)
     } catch {
       setError('Помилка мережі')
       setStatus('parsed')
     }
   }
 
-  // ─── Рендер ───────────────────────────────────────────────────────────────
+  const handleSave = () => doSave(duplicates)
 
-  const totalVehicles = sheets
+  // ─── Тоггл аркуша ─────────────────────────────────────────────────────────
+
+  const toggleSheet = (name: string) => {
+    setSelectedSheets(prev => {
+      const next = new Set(prev)
+      next.has(name) ? next.delete(name) : next.add(name)
+      return next
+    })
+  }
+
+  // ─── Підрахунок ───────────────────────────────────────────────────────────
+
+  const totalVehicles  = sheets
     .filter(s => selectedSheets.has(s.sheetName))
     .reduce((sum, s) => sum + s.vehicles.length, 0)
 
   const totalErrors = sheets.flatMap(s => s.errors).length
 
+  const dupIncluded = duplicates.filter(d => d.include).length
+  const dupSkipped  = duplicates.filter(d => !d.include).length
+
+  // ─── Рендер ───────────────────────────────────────────────────────────────
+
   return (
     <div className="min-h-screen bg-gray-50">
-            <AdminHeader title="📊 Імпорт Excel" />
+      <AdminHeader title="📊 Імпорт Excel" />
 
       <main className="max-w-5xl mx-auto px-6 py-8 space-y-6">
 
@@ -164,7 +273,7 @@ export default function ImportPage() {
         <Section title="1. Режим парсингу">
           <div className="flex gap-3">
             <ModeBtn active={mode === 'template'} onClick={() => { setMode('template'); setSheets([]) }}>
-              📋 По листах (шаблон)
+              📋 По шаблону
             </ModeBtn>
             <ModeBtn active={mode === 'custom'} onClick={() => { setMode('custom'); setSheets([]) }}>
               ⚙️ Довільні колонки
@@ -172,7 +281,7 @@ export default function ImportPage() {
           </div>
           <p className="text-sm text-gray-500 mt-2">
             {mode === 'template'
-              ? 'Кожен лист — окремий проект. Назва і дата беруться з фіксованих клітинок.'
+              ? 'Стандартний шаблон: Номер(A), Компанія(B), Проект(C), Тип(D), Дійсний до(E). Всі колонки налаштовуються.'
               : 'Один або кілька листів з довільною структурою. Ви вказуєте які колонки читати.'}
           </p>
         </Section>
@@ -184,7 +293,7 @@ export default function ImportPage() {
               ☁️ Google Drive / Sheets
             </ModeBtn>
             <ModeBtn active={source === 'file'} onClick={() => setSource('file')}>
-              💾 Файл з комп'ютера
+              💾 Файл з комп&apos;ютера
             </ModeBtn>
           </div>
 
@@ -198,54 +307,109 @@ export default function ImportPage() {
                 placeholder="https://docs.google.com/spreadsheets/d/... або https://drive.google.com/file/d/..."
                 className="input w-full"
               />
-              <p className="text-xs text-gray-400 mt-1">
-                Файл повинен бути відкритий для перегляду («Усі, хто має посилання»).
-                Підтримуються Google Sheets та .xlsx на Drive.
-              </p>
             </div>
           ) : (
             <div>
               <label className="label">Файл Excel (.xlsx, .xls)</label>
-              <input ref={fileRef} type="file" accept=".xlsx,.xls" className="input-file" />
+              <input ref={fileRef} type="file" accept=".xlsx,.xls,.xlsm" className="input-file" />
             </div>
           )}
         </Section>
 
-        {/* ── Налаштування парсингу ── */}
+        {/* ── Налаштування колонок ── */}
         <Section title="3. Налаштування колонок">
           {mode === 'template' ? (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <Field label="Клітинка проекту" hint="напр. B2">
-                <input className="input" value={tmpl.projectCell}
-                  onChange={e => setTmpl(p => ({ ...p, projectCell: e.target.value.toUpperCase() }))} />
-              </Field>
-              <Field label="Клітинка дати закінч." hint="напр. D3">
-                <input className="input" value={tmpl.dateCell}
-                  onChange={e => setTmpl(p => ({ ...p, dateCell: e.target.value.toUpperCase() }))} />
-              </Field>
-              <Field label="Колонка авто" hint="напр. A">
-                <input className="input" value={tmpl.vehicleCol}
-                  onChange={e => setTmpl(p => ({ ...p, vehicleCol: e.target.value.toUpperCase() }))} />
-              </Field>
-              <Field label="Авто з рядка" hint="напр. 5">
-                <input className="input" type="number" min={1} value={tmpl.startRow}
-                  onChange={e => setTmpl(p => ({ ...p, startRow: parseInt(e.target.value) || 1 }))} />
-              </Field>
+            <div className="space-y-4">
+              <p className="text-xs text-gray-400">
+                Залиш колонку порожньою — значення не читатиметься.
+                Проект/дата з фіксованих клітинок — fallback якщо per-row колонки не задані.
+              </p>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <Field label="Колонка номера *" hint="напр. A">
+                  <input className="input" value={tmpl.vehicleCol}
+                    onChange={e => setTmpl(p => ({ ...p, vehicleCol: e.target.value.toUpperCase() }))} />
+                </Field>
+                <Field label="Колонка компанії" hint="напр. B">
+                  <input className="input" value={tmpl.companyCol ?? ''}
+                    onChange={e => setTmpl(p => ({ ...p, companyCol: e.target.value.toUpperCase() }))} />
+                </Field>
+                <Field label="Колонка проекту" hint="напр. C">
+                  <input className="input" value={tmpl.projectColPerRow ?? ''}
+                    onChange={e => setTmpl(p => ({ ...p, projectColPerRow: e.target.value.toUpperCase() }))} />
+                </Field>
+                <Field label="Колонка типу доступу" hint="напр. D">
+                  <input className="input" value={tmpl.accessTypeCol ?? ''}
+                    onChange={e => setTmpl(p => ({ ...p, accessTypeCol: e.target.value.toUpperCase() }))} />
+                </Field>
+                <Field label="Колонка «дійсний до»" hint="напр. E">
+                  <input className="input" value={tmpl.expiresAtColPerRow ?? ''}
+                    onChange={e => setTmpl(p => ({ ...p, expiresAtColPerRow: e.target.value.toUpperCase() }))} />
+                </Field>
+                <Field label="Колонка контакту" hint="напр. F (необов.)">
+                  <input className="input" value={tmpl.contactNameCol ?? ''}
+                    onChange={e => setTmpl(p => ({ ...p, contactNameCol: e.target.value.toUpperCase() }))} />
+                </Field>
+                <Field label="Колонка телефону" hint="напр. G (необов.)">
+                  <input className="input" value={tmpl.contactPhoneCol ?? ''}
+                    onChange={e => setTmpl(p => ({ ...p, contactPhoneCol: e.target.value.toUpperCase() }))} />
+                </Field>
+                <Field label="Колонка примітки" hint="напр. H (необов.)">
+                  <input className="input" value={tmpl.noteCol ?? ''}
+                    onChange={e => setTmpl(p => ({ ...p, noteCol: e.target.value.toUpperCase() }))} />
+                </Field>
+              </div>
+              <div className="border-t pt-3">
+                <p className="text-xs text-gray-400 mb-2">Fallback (якщо per-row колонки порожні)</p>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  <Field label="Клітинка проекту" hint="напр. B2">
+                    <input className="input" value={tmpl.projectCell}
+                      onChange={e => setTmpl(p => ({ ...p, projectCell: e.target.value.toUpperCase() }))} />
+                  </Field>
+                  <Field label="Клітинка дати" hint="напр. D3">
+                    <input className="input" value={tmpl.dateCell}
+                      onChange={e => setTmpl(p => ({ ...p, dateCell: e.target.value.toUpperCase() }))} />
+                  </Field>
+                  <Field label="Дані з рядка" hint="напр. 2">
+                    <input className="input" type="number" min={1} value={tmpl.startRow}
+                      onChange={e => setTmpl(p => ({ ...p, startRow: parseInt(e.target.value) || 1 }))} />
+                  </Field>
+                </div>
+              </div>
             </div>
           ) : (
             <div className="space-y-4">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <Field label="Колонка номерів авто *" hint="напр. A">
+                <Field label="Колонка номерів *" hint="напр. A">
                   <input className="input" value={custom.plateCol}
                     onChange={e => setCustom(p => ({ ...p, plateCol: e.target.value.toUpperCase() }))} />
                 </Field>
-                <Field label="Колонка проекту" hint="напр. B (або залиш порожнім)">
-                  <input className="input" value={custom.projectCol}
+                <Field label="Колонка компанії" hint="напр. B">
+                  <input className="input" value={custom.companyCol ?? ''}
+                    onChange={e => setCustom(p => ({ ...p, companyCol: e.target.value.toUpperCase() }))} />
+                </Field>
+                <Field label="Колонка проекту" hint="напр. C">
+                  <input className="input" value={custom.projectCol ?? ''}
                     onChange={e => setCustom(p => ({ ...p, projectCol: e.target.value.toUpperCase() }))} />
                 </Field>
-                <Field label="Колонка «дійсний до»" hint="напр. C">
-                  <input className="input" value={custom.dateToCol}
+                <Field label="Колонка типу доступу" hint="напр. D">
+                  <input className="input" value={custom.accessTypeCol ?? ''}
+                    onChange={e => setCustom(p => ({ ...p, accessTypeCol: e.target.value.toUpperCase() }))} />
+                </Field>
+                <Field label="Колонка «дійсний до»" hint="напр. E">
+                  <input className="input" value={custom.dateToCol ?? ''}
                     onChange={e => setCustom(p => ({ ...p, dateToCol: e.target.value.toUpperCase() }))} />
+                </Field>
+                <Field label="Колонка контакту" hint="напр. F (необов.)">
+                  <input className="input" value={custom.contactNameCol ?? ''}
+                    onChange={e => setCustom(p => ({ ...p, contactNameCol: e.target.value.toUpperCase() }))} />
+                </Field>
+                <Field label="Колонка телефону" hint="напр. G (необов.)">
+                  <input className="input" value={custom.contactPhoneCol ?? ''}
+                    onChange={e => setCustom(p => ({ ...p, contactPhoneCol: e.target.value.toUpperCase() }))} />
+                </Field>
+                <Field label="Колонка примітки" hint="напр. H (необов.)">
+                  <input className="input" value={custom.noteCol ?? ''}
+                    onChange={e => setCustom(p => ({ ...p, noteCol: e.target.value.toUpperCase() }))} />
                 </Field>
                 <Field label="Дані з рядка" hint="напр. 2">
                   <input className="input" type="number" min={1} value={custom.dataStartRow}
@@ -254,7 +418,7 @@ export default function ImportPage() {
               </div>
               {!custom.projectCol && (
                 <Field label="Фіксована назва проекту" hint="якщо колонка проекту не задана">
-                  <input className="input w-full" value={custom.projectFixed}
+                  <input className="input w-full" value={custom.projectFixed ?? ''}
                     onChange={e => setCustom(p => ({ ...p, projectFixed: e.target.value }))}
                     placeholder="напр. Об'єкт №12" />
                 </Field>
@@ -273,7 +437,7 @@ export default function ImportPage() {
             {status === 'loading' ? '⏳ Завантаження...' : '🔍 Аналізувати'}
           </button>
           {sheets.length > 0 && (
-            <button onClick={() => { setSheets([]); setStatus('idle'); setSaveResult(null) }}
+            <button onClick={() => { setSheets([]); setStatus('idle'); setSaveResult(null); setDuplicates([]); setShowDuplicates(false) }}
               className="btn-secondary">
               Очистити
             </button>
@@ -318,19 +482,79 @@ export default function ImportPage() {
               ))}
             </div>
 
+            {/* Панель дублікатів */}
+            {showDuplicates && duplicates.length > 0 && (
+              <div className="mt-6 border border-yellow-200 bg-yellow-50 rounded-xl p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-semibold text-yellow-800 text-sm">
+                    ⚠️ Знайдено {duplicates.length} номерів, що вже є в базі
+                  </h3>
+                  <div className="flex gap-2">
+                    <button onClick={() => toggleAllDuplicates(true)}
+                      className="text-xs px-2 py-1 bg-white border border-yellow-300 rounded-lg text-yellow-700 hover:bg-yellow-100">
+                      Оновити всі
+                    </button>
+                    <button onClick={() => toggleAllDuplicates(false)}
+                      className="text-xs px-2 py-1 bg-white border border-yellow-300 rounded-lg text-yellow-700 hover:bg-yellow-100">
+                      Пропустити всі
+                    </button>
+                  </div>
+                </div>
+                <p className="text-xs text-yellow-700 mb-3">
+                  Оберіть які номери оновити (✓), а які пропустити (✗):
+                </p>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-2 max-h-64 overflow-y-auto">
+                  {duplicates.map(d => (
+                    <label key={d.plate}
+                      className={`flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition-colors text-sm ${
+                        d.include
+                          ? 'bg-orange-100 border-orange-300 text-orange-800'
+                          : 'bg-white border-gray-200 text-gray-400 line-through'
+                      }`}>
+                      <input
+                        type="checkbox"
+                        checked={d.include}
+                        onChange={() => toggleDuplicate(d.plate)}
+                        className="w-3.5 h-3.5 accent-orange-500"
+                      />
+                      <span className="font-mono font-medium">{d.plate}</span>
+                    </label>
+                  ))}
+                </div>
+                <div className="mt-3 flex items-center gap-3 text-xs text-yellow-700">
+                  <span>✓ Оновити: <strong>{dupIncluded}</strong></span>
+                  <span>✗ Пропустити: <strong>{dupSkipped}</strong></span>
+                </div>
+              </div>
+            )}
+
             {/* Кнопка збереження */}
             <div className="mt-6 flex items-center gap-4">
-              <button
-                onClick={handleSave}
-                disabled={status === 'saving' || totalVehicles === 0}
-                className="btn-primary"
-              >
-                {status === 'saving'
-                  ? '⏳ Збереження...'
-                  : `💾 Імпортувати ${totalVehicles} авто`}
-              </button>
+              {!showDuplicates ? (
+                <button
+                  onClick={handleCheckDuplicates}
+                  disabled={checkingDups || status === 'saving' || totalVehicles === 0}
+                  className="btn-primary"
+                >
+                  {checkingDups
+                    ? '⏳ Перевірка...'
+                    : `💾 Імпортувати ${totalVehicles} авто`}
+                </button>
+              ) : (
+                <button
+                  onClick={handleSave}
+                  disabled={status === 'saving'}
+                  className="btn-primary"
+                >
+                  {status === 'saving'
+                    ? '⏳ Збереження...'
+                    : `✅ Підтвердити імпорт (${totalVehicles - dupSkipped} авто)`}
+                </button>
+              )}
               <span className="text-xs text-gray-400">
-                Існуючі записи будуть оновлені, нові — додані.
+                {showDuplicates
+                  ? 'Обрані дублікати будуть оновлені, решта — пропущена.'
+                  : 'Спочатку перевіримо наявність дублікатів у базі.'}
               </span>
             </div>
           </Section>
@@ -338,7 +562,6 @@ export default function ImportPage() {
 
       </main>
 
-      {/* Глобальні стилі для цієї сторінки */}
       <style jsx global>{`
         .label  { display:block; font-size:.75rem; font-weight:600; color:#6b7280; margin-bottom:.25rem; }
         .input  { width:100%; border:1px solid #e5e7eb; border-radius:.5rem; padding:.4rem .6rem;
@@ -346,9 +569,9 @@ export default function ImportPage() {
         .input:focus { border-color:#3b82f6; box-shadow:0 0 0 2px #bfdbfe; }
         .input-file { font-size:.875rem; }
         .btn-primary   { padding:.5rem 1.25rem; background:#2563eb; color:#fff; border-radius:.75rem;
-                         font-size:.875rem; font-weight:500; transition:background .15s;
-                         disabled:opacity-40 disabled:cursor-not-allowed; }
+                         font-size:.875rem; font-weight:500; transition:background .15s; }
         .btn-primary:hover:not(:disabled) { background:#1d4ed8; }
+        .btn-primary:disabled { opacity:.4; cursor:not-allowed; }
         .btn-secondary { padding:.5rem 1.25rem; background:#f3f4f6; color:#374151;
                          border-radius:.75rem; font-size:.875rem; font-weight:500; }
         .btn-secondary:hover { background:#e5e7eb; }
@@ -419,7 +642,6 @@ function SheetPreview({ sheet, selected, onToggle }: {
     <div className={`border rounded-xl overflow-hidden transition-colors ${
       selected ? 'border-blue-200' : 'border-gray-200 opacity-60'
     }`}>
-      {/* Заголовок аркуша */}
       <div className="flex items-center gap-3 px-4 py-3 bg-gray-50">
         <input
           type="checkbox"
@@ -450,16 +672,49 @@ function SheetPreview({ sheet, selected, onToggle }: {
         </button>
       </div>
 
-      {/* Список авто */}
       {expanded && (
-        <div className="px-4 py-3 space-y-2">
+        <div className="px-4 py-3 space-y-3">
           {sheet.vehicles.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {sheet.vehicles.map((v, i) => (
-                <span key={i} className="text-xs font-mono bg-blue-50 text-blue-800 px-2 py-1 rounded-md">
-                  {v.plate}
-                </span>
-              ))}
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs border-collapse">
+                <thead>
+                  <tr className="bg-gray-100 text-gray-500">
+                    <th className="text-left px-2 py-1 rounded-l">Номер</th>
+                    <th className="text-left px-2 py-1">Компанія</th>
+                    <th className="text-left px-2 py-1">Проект</th>
+                    <th className="text-left px-2 py-1">Тип</th>
+                    <th className="text-left px-2 py-1">Дійсний до</th>
+                    <th className="text-left px-2 py-1">Контакт</th>
+                    <th className="text-left px-2 py-1 rounded-r">Примітка</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sheet.vehicles.map((v: ParsedVehicle, i: number) => (
+                    <tr key={i} className="border-t border-gray-100 hover:bg-gray-50">
+                      <td className="px-2 py-1 font-mono font-semibold text-blue-800">{v.plate}</td>
+                      <td className="px-2 py-1 text-gray-700">{v.company || '—'}</td>
+                      <td className="px-2 py-1 text-gray-700">{v.project || '—'}</td>
+                      <td className="px-2 py-1">
+                        <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${
+                          v.accessType === 'PERMANENT'  ? 'bg-green-100 text-green-700' :
+                          v.accessType === 'SINGLE_USE' ? 'bg-purple-100 text-purple-700' :
+                                                          'bg-orange-100 text-orange-700'
+                        }`}>
+                          {v.accessType === 'PERMANENT' ? 'Постійний' :
+                           v.accessType === 'SINGLE_USE' ? 'Разовий' : 'Тимчасовий'}
+                        </span>
+                      </td>
+                      <td className="px-2 py-1 text-gray-600">
+                        {v.expiresAt ? new Date(v.expiresAt).toLocaleDateString('uk-UA') : '—'}
+                      </td>
+                      <td className="px-2 py-1 text-gray-600">
+                        {v.contactName ? `${v.contactName}${v.contactPhone ? ` · ${v.contactPhone}` : ''}` : '—'}
+                      </td>
+                      <td className="px-2 py-1 text-gray-500">{v.note || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
           {sheet.errors.length > 0 && (
