@@ -1,8 +1,9 @@
-import { jwtVerify } from 'jose'
 import { NextResponse, type NextRequest } from 'next/server'
+import { jwtVerify, SignJWT } from 'jose'
 
 const SECRET = new TextEncoder().encode(process.env.JWT_SECRET ?? '')
 const TOKEN_COOKIE = 'kpp_token'
+const CONFIG_COOKIE = 'kpp_config'
 
 // Маршрути що захищені JWT
 const PROTECTED_ADMIN_PATHS = ['/admin']
@@ -12,24 +13,24 @@ const PROTECTED_API_PATHS = [
   '/api/emergency',
   '/api/projects',
   '/api/logs',
-  '/api/auth/users',  // тільки для ADMIN
-  '/api/auth/me',     // потрібен токен щоб повернути поточного юзера
+  '/api/auth/users',
+  '/api/auth/me',
+  '/api/settings',
 ]
 
-// Публічні — без токену
 const PUBLIC_PATHS = [
   '/api/vehicles/sync',
   '/api/emergency/sync',
   '/api/logs/batch',
   '/api/checkpoint',
-  '/api/auth/login',   // логін
-  '/admin/login',      // сторінка логіну
+  '/api/auth/login',
+  '/admin/login',
 ]
 
-// Тільки ADMIN може звертатись до цих шляхів
 const ADMIN_ONLY_PATHS = [
   '/api/auth/users',
   '/api/import',
+  '/api/settings',
 ]
 
 function isPublic(pathname: string): boolean {
@@ -49,18 +50,74 @@ function isAdminOnly(pathname: string): boolean {
   return ADMIN_ONLY_PATHS.some(p => pathname.startsWith(p))
 }
 
+/**
+ * Перевіряє чи потрібна авторизація для сторінки оператора (/).
+ *
+ * Пріоритет:
+ * 1. ENV змінна AUTH_OPERATOR_REQUIRED=true/false — найвищий пріоритет, вимагає рестарту
+ * 2. Cookie kpp_config — встановлюється з адмін-панелі, без рестарту
+ * 3. За замовчуванням: false (режим тестування)
+ */
+async function isOperatorAuthRequired(req: NextRequest): Promise<boolean> {
+  // 1. ENV override
+  const envVal = process.env.AUTH_OPERATOR_REQUIRED
+  if (envVal === 'true') return true
+  if (envVal === 'false') return false
+
+  // 2. Config cookie (встановлюється адміном)
+  const configCookie = req.cookies.get(CONFIG_COOKIE)?.value
+  if (configCookie) {
+    try {
+      const { payload } = await jwtVerify(configCookie, SECRET)
+      return payload.operatorAuthRequired === true
+    } catch {
+      // cookie недійсний — ігноруємо
+    }
+  }
+
+  // 3. Default: відкритий доступ (тестування)
+  return false
+}
+
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl
 
-  // Публічні маршрути — пропускаємо
   if (isPublic(pathname)) return NextResponse.next()
 
+  // ── Сторінка оператора / ──────────────────────────────────────────
+  if (pathname === '/') {
+    const authRequired = await isOperatorAuthRequired(req)
+    if (!authRequired) return NextResponse.next()
+
+    const token = req.cookies.get(TOKEN_COOKIE)?.value
+    if (!token) {
+      const loginUrl = new URL('/admin/login', req.url)
+      loginUrl.searchParams.set('from', '/')
+      return NextResponse.redirect(loginUrl)
+    }
+
+    try {
+      const { payload } = await jwtVerify(token, SECRET)
+      const res = NextResponse.next()
+      res.headers.set('x-user-id', String(payload.sub))
+      res.headers.set('x-user-role', payload.role as string)
+      res.headers.set('x-username', String(payload.username ?? ''))
+      return res
+    } catch {
+      const loginUrl = new URL('/admin/login', req.url)
+      loginUrl.searchParams.set('from', '/')
+      const res = NextResponse.redirect(loginUrl)
+      res.cookies.delete(TOKEN_COOKIE)
+      return res
+    }
+  }
+
+  // ── Адмін-панель та API ───────────────────────────────────────────
   const isAdminPage = isProtectedAdmin(pathname)
   const isApiRoute = isProtectedApi(pathname)
 
   if (!isAdminPage && !isApiRoute) return NextResponse.next()
 
-  // Читаємо токен з cookie (адмін) або Authorization Bearer (API)
   const cookieToken = req.cookies.get(TOKEN_COOKIE)?.value
   const authHeader = req.headers.get('authorization') || ''
   const bearerToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null
@@ -75,27 +132,23 @@ export async function middleware(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  // Верифікуємо JWT
   try {
     const { payload } = await jwtVerify(token, SECRET)
     const role = payload.role as string
 
-    // ADMIN_ONLY маршрути — тільки для адміна
     if (isAdminOnly(pathname) && role !== 'ADMIN') {
       if (isAdminPage) return NextResponse.redirect(new URL('/admin', req.url))
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    // Передаємо userId і role через заголовки в route handlers
     const response = NextResponse.next()
     response.headers.set('x-user-id', String(payload.sub))
     response.headers.set('x-user-role', role)
-    response.headers.set('x-username', String(payload.username))
+    response.headers.set('x-username', String(payload.username ?? ''))
     response.headers.set('Cache-Control', 'no-store')
     return response
 
   } catch {
-    // Токен недійсний або прострочений
     if (isAdminPage) {
       const loginUrl = new URL('/admin/login', req.url)
       loginUrl.searchParams.set('expired', '1')
@@ -111,6 +164,7 @@ export async function middleware(req: NextRequest) {
 
 export const config = {
   matcher: [
+    '/',
     '/admin/:path*',
     '/api/vehicles/:path*',
     '/api/import/:path*',
@@ -119,5 +173,6 @@ export const config = {
     '/api/logs/:path*',
     '/api/auth/users/:path*',
     '/api/auth/me',
+    '/api/settings/:path*',
   ],
 }

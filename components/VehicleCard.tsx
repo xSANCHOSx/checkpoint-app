@@ -147,18 +147,6 @@ async function handleLog() {
             </div>
           )}
 
-          {/* Проект */}
-          {vehicle.projectName && (
-            <div className={`text-xs mt-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-medium ${
-              vehicle.projectActive === false
-                ? 'bg-gray-100 text-gray-400'
-                : 'bg-indigo-100 text-indigo-700'
-            }`}>
-              {vehicle.projectActive === false && <span>⏸</span>}
-              📁 {vehicle.projectName}
-              {vehicle.projectActive === false && <span className="ml-1">(вимкнено)</span>}
-            </div>
-          )}
 
           {/* Примітка */}
           {vehicle.note && (
@@ -183,6 +171,28 @@ async function handleLog() {
           {logged ? '✓ Записано' : logging ? '...' : 'Записати'}
         </button>
       </div>
+
+      {/* Проект — повна ширина внизу картки */}
+      <span>proect</span>
+      {vehicle.projectName && (
+        <div className={`mt-3 pt-3 border-t ${
+          vehicle.projectActive === false ? 'border-gray-200' : 'border-indigo-100'
+        }`}>
+          <div className={`flex items-center gap-2 text-sm font-medium ${
+            vehicle.projectActive === false ? 'text-gray-400' : 'text-indigo-700'
+          }`}>
+            <span className="shrink-0">
+              {vehicle.projectActive === false ? '⏸' : '📁'}
+            </span>
+            <span className="leading-snug">
+              {vehicle.projectName}
+              {vehicle.projectActive === false && (
+                <span className="ml-2 text-xs font-normal text-gray-400">(вимкнено)</span>
+              )}
+            </span>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

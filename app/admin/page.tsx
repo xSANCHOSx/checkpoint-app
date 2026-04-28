@@ -1,5 +1,6 @@
 'use client'
 import { AdminHeader } from '@/components/admin/AdminHeader'
+import { AuthStatusBanner } from '@/components/admin/AuthStatusBanner'
 import { useAuth } from '@/hooks/useAuth'
 import { useSync } from '@/hooks/useSync'
 import Link from 'next/link'
@@ -18,6 +19,10 @@ export default function AdminPage() {
       <AdminHeader />
 
       <main className="max-w-5xl mx-auto px-6 py-8">
+
+        {/* Статус авторизації оператора */}
+        <AuthStatusBanner />
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
           {/* Авто */}
@@ -102,6 +107,22 @@ export default function AdminPage() {
               </h2>
               <p className="text-sm text-gray-500 mt-1">
                 Додавання операторів та адміністраторів. Зміна паролів та ролей.
+              </p>
+            </Link>
+          )}
+
+          {/* Налаштування — тільки для адміна */}
+          {user?.role === 'ADMIN' && (
+            <Link
+              href="/admin/settings"
+              className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-md transition-shadow group"
+            >
+              <div className="text-3xl mb-3">⚙️</div>
+              <h2 className="text-lg font-semibold text-gray-800 group-hover:text-gray-600 transition-colors">
+                Налаштування
+              </h2>
+              <p className="text-sm text-gray-500 mt-1">
+                Увімкнення авторизації для операторів. Режим тестування.
               </p>
             </Link>
           )}
