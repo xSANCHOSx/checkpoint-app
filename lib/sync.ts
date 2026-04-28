@@ -1,4 +1,4 @@
-import { localDb, getPendingLogs, markLogsSynced } from './localDb'
+import { getPendingLogs, localDb, markLogsSynced } from './localDb'
 
 const LAST_SYNC_KEY = 'checkpoint_last_sync'
 const MAX_RETRIES = 3
@@ -75,7 +75,16 @@ async function pushPendingLogs(): Promise<number> {
 
 // Завантажуємо оновлені авто з сервера (з retry та пагінацією)
 async function pullVehicles(): Promise<number> {
-  const lastSync = localStorage.getItem(LAST_SYNC_KEY) || '1970-01-01T00:00:00Z'
+  const storedLastSync = localStorage.getItem(LAST_SYNC_KEY)
+
+  // Якщо локальна БД порожня — ігноруємо lastSync і тягнемо все.
+  // Це вирішує кейс: localStorage має дату, але IndexedDB очищена
+  // (новий браузер, clear cache, інкогніто) → інакше пошук не знаходить нічого.
+  const localCount = await localDb.vehicles.count()
+  const lastSync = (storedLastSync && localCount > 0)
+    ? storedLastSync
+    : '1970-01-01T00:00:00Z'
+
   let total = 0
   let page = 0
   const limit = 500
