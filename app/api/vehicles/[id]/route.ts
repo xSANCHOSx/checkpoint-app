@@ -17,8 +17,9 @@ export async function PUT(
       where: { id },
       data: {
         ...(plate && { plate, digits: extractDigits(plate) }),
-        company: body.company,
+        company: body.company || null,
         projectId: body.projectId ? Number(body.projectId) : null,
+        companyId: body.companyId ? Number(body.companyId) : null,
         contactName: body.contactName || null,
         contactPhone: body.contactPhone || null,
         accessType: body.accessType,

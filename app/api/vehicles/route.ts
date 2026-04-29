@@ -41,6 +41,9 @@ export async function GET(request: NextRequest) {
         project: {
           select: { id: true, name: true, active: true },
         },
+        companyRef: {
+          select: { id: true, name: true, active: true },
+        },
       },
     }),
     prisma.vehicle.count({ where }),
@@ -62,8 +65,9 @@ export async function POST(request: NextRequest) {
       data: {
         plate,
         digits: extractDigits(plate),
-        company: body.company || '',
+        company: body.company || null,
         projectId: body.projectId ? Number(body.projectId) : null,
+        companyId: body.companyId ? Number(body.companyId) : null,
         contactName: body.contactName || null,
         contactPhone: body.contactPhone || null,
         accessType: body.accessType || 'PERMANENT',

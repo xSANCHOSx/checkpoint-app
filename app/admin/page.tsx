@@ -91,6 +91,20 @@ export default function AdminPage() {
             </p>
           </Link>
 
+          {/* Компанії */}
+          <Link
+            href="/admin/companies"
+            className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-md transition-shadow group"
+          >
+            <div className="text-3xl mb-3">🏢</div>
+            <h2 className="text-lg font-semibold text-gray-800 group-hover:text-blue-600 transition-colors">
+              Компанії
+            </h2>
+            <p className="text-sm text-gray-500 mt-1">
+              Групування авто по компаніях. Вмикати/вимикати, видаляти цілу компанію.
+            </p>
+          </Link>
+
           {/* Користувачі — тільки для адміна */}
           {user?.role === 'ADMIN' && (
             <Link

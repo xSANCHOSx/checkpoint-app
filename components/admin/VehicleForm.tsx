@@ -1,8 +1,15 @@
 'use client'
 import type { Vehicle } from '@/app/admin/vehicles/page'
+import Link from 'next/link'
 import { useEffect, useState } from 'react'
 
 interface Project {
+  id: number
+  name: string
+  active: boolean
+}
+
+interface Company {
   id: number
   name: string
   active: boolean
@@ -19,7 +26,7 @@ export function VehicleForm({ vehicle, onClose, onSaved }: Props) {
 
   const [form, setForm] = useState({
     plate:        vehicle?.plate        ?? '',
-    company:      vehicle?.company      ?? '',
+    companyId:    (vehicle as (Vehicle & { companyId?: number | null }) | null)?.companyId ?? null as number | null,
     projectId:    (vehicle as (Vehicle & { projectId?: number | null }) | null)?.projectId ?? null as number | null,
     contactName:  vehicle?.contactName  ?? '',
     contactPhone: vehicle?.contactPhone ?? '',
@@ -31,11 +38,17 @@ export function VehicleForm({ vehicle, onClose, onSaved }: Props) {
   })
 
   const [projects, setProjects] = useState<Project[]>([])
+  const [companies, setCompanies] = useState<Company[]>([])
 
   useEffect(() => {
     fetch('/api/projects')
       .then(r => r.json())
       .then((data: Project[]) => setProjects(data))
+      .catch(() => {})
+
+    fetch('/api/companies')
+      .then(r => r.json())
+      .then((data: Company[]) => setCompanies(data))
       .catch(() => {})
   }, [])
 
@@ -48,13 +61,14 @@ export function VehicleForm({ vehicle, onClose, onSaved }: Props) {
   async function handleSubmit() {
     setError('')
     if (!form.plate.trim()) {
-      setError('Номер авто обов\'язковий')
+      setError("Номер авто обов'язковий")
       return
     }
     setLoading(true)
     try {
       const body = {
         ...form,
+        companyId: form.companyId ?? null,
         projectId: form.projectId ?? null,
         expiresAt: form.expiresAt || null,
         contactName: form.contactName || null,
@@ -112,6 +126,54 @@ export function VehicleForm({ vehicle, onClose, onSaved }: Props) {
             />
           </div>
 
+          {/* Компанія */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Компанія
+            </label>
+            {(() => {
+              const currentCompany = companies.find(c => c.id === form.companyId)
+              const isInactive = currentCompany && !currentCompany.active
+              return (
+                <>
+                  <select
+                    value={form.companyId ?? ''}
+                    onChange={e => setForm(f => ({ ...f, companyId: e.target.value ? Number(e.target.value) : null }))}
+                    disabled={!!isInactive}
+                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                      isInactive
+                        ? 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed'
+                        : 'border-gray-300'
+                    }`}
+                  >
+                    <option value="">— Без компанії —</option>
+                    {companies.map(c => (
+                      <option key={c.id} value={c.id}>
+                        {c.active ? '' : '⏸ '}{c.name}{c.active ? '' : ' (вимкнено)'}
+                      </option>
+                    ))}
+                  </select>
+                  {isInactive ? (
+                    <p className="text-xs text-amber-600 mt-1">
+                      ⏸ Компанію вимкнено — зміна недоступна
+                    </p>
+                  ) : (
+                    <div className="mt-1">
+                      <Link
+                        href="/admin/companies"
+                        target="_blank"
+                        className="text-xs text-blue-500 hover:text-blue-700 hover:underline"
+                      >
+                        + Додати компанію
+                      </Link>
+                    </div>
+                  )}
+                </>
+              )
+            })()}
+          </div>
+
+          {/* Проект */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Проект
@@ -138,27 +200,24 @@ export function VehicleForm({ vehicle, onClose, onSaved }: Props) {
                       </option>
                     ))}
                   </select>
-                  {isInactive && (
+                  {isInactive ? (
                     <p className="text-xs text-amber-600 mt-1">
                       ⏸ Проект вимкнено — зміна недоступна
                     </p>
+                  ) : (
+                    <div className="mt-1">
+                      <Link
+                        href="/admin/projects"
+                        target="_blank"
+                        className="text-xs text-blue-500 hover:text-blue-700 hover:underline"
+                      >
+                        + Додати проект
+                      </Link>
+                    </div>
                   )}
                 </>
               )
             })()}
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Компанія / Організація *
-            </label>
-            <input
-              type="text"
-              value={form.company}
-              onChange={e => set('company', e.target.value)}
-              placeholder="ТОВ Приклад"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
           </div>
 
           <div>
